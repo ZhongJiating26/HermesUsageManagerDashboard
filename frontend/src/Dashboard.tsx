@@ -31,7 +31,7 @@ function MockPages({ page, selection, filters, search, drill, refreshFilters }: 
   return <ModelsPage />;
 }
 
-export function Dashboard({ live = false, ready = false, collection = 'unavailable' }: { live?: boolean; ready?: boolean; collection?: string }) {
+export function Dashboard({ live = false, ready = false }: { live?: boolean; ready?: boolean }) {
   const params = new URLSearchParams(window.location.search);
   const [page, setPage] = React.useState<PageId>(() => knownPage(params.get('hum_page')));
   const anchor = live ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date()) : '2026-10-15';
@@ -69,7 +69,8 @@ export function Dashboard({ live = false, ready = false, collection = 'unavailab
   };
   return <section className="hum-root" aria-label="用量管理"><div className="hum-mobile-bar"><b>用量管理</b><button className="hum-outline" aria-expanded={drawer} aria-controls="hum-navigation" onClick={() => setDrawer(!drawer)}>{drawer ? '收起导航' : '打开导航'}</button></div>
     <aside className={`hum-sidebar ${drawer ? 'hum-sidebar-open' : ''}`} id="hum-navigation"><nav aria-label="用量管理导航"><p className="hum-nav-label">数据</p>{pages.map((item, index) => <React.Fragment key={item.id}>{index === 5 && <><hr /><p className="hum-nav-label">配置</p></>}<button className={page === item.id ? 'hum-nav-active' : ''} aria-current={page === item.id ? 'page' : undefined} disabled={!permitted(item.id)} onClick={() => navigate(item.id as PageId)}><MaterialIcon name={item.icon} />{item.label}</button></React.Fragment>)}</nav></aside>
-    <main className="hum-content"><div className="hum-page-heading"><div className="hum-title"><h1>{title}</h1><InfoTip key={page} label={`${title}说明`}><p>{pageNotes[page]}</p>{!live ? <p>模拟范围：3 个 Profile · 虚构人员 · Asia/Shanghai · 固定基准日 2026-10-15</p> : <p>范围仅限当前配置数据库；全部 Profile 清单未知，真实 Hermes 兼容性待验证。采集状态：{collection}。</p>}{ready && <CollectionDetails selection={selection} />}</InfoTip></div><span className="hum-badge">{live ? `Live · M4 · 采集 ${collection}` : '模拟数据 · M4 SQLite'}</span></div>
+    <main className="hum-content"><div className="hum-page-heading"><div className="hum-title"><h1>{title}</h1><InfoTip key={page} label={`${title}说明`}><p>{pageNotes[page]}</p>{!live ? <p>模拟范围：3 个 Profile · 虚构人员 · Asia/Shanghai · 固定基准日 2026-10-15</p> : <p>统计范围为当前配置数据库。</p>}</InfoTip></div><span className="hum-badge">{live ? '实时数据' : '模拟数据'}</span></div>
+      {ready && !['people', 'models'].includes(page) && <CollectionDetails selection={selection} />}
       {!ready ? <div className="hum-empty"><h2>业务数据尚未接入</h2><p>存储或业务接口不可用，请检查插件数据路径和身份适配配置。</p><p>不会回退到模拟统计。采集需在测试 Hermes 中显式启用。</p></div> : <MockWorkspace page={page} selection={selection} setSelection={setSelection} search={search} navigate={navigate} permitted={permitted(page)} setRole={setRole} range={range} setRange={setRange} customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd} dateError={dateError} setDateError={setDateError} />}
     </main>
   </section>;

@@ -38,6 +38,6 @@ test('Live API contract can render without any mock fallback', async ({ page }) 
   });
   await page.goto('/');
   await expect(page.locator('.hum-chart')).toHaveCount(6);
-  await expect(page.getByText('Live · M4 · 采集 unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByText('实时数据', { exact: true })).toBeVisible();
   await page.screenshot({ path: '../build/m2/live-contract.png', fullPage: true });
 });

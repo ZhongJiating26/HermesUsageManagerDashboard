@@ -1,21 +1,21 @@
 import { test, expect } from './fixtures';
 
-test('quality diagnostics stay in the title info panel and report honest scope', async ({ page }) => {
+test('quality diagnostics collapse behind one status line and report honest scope', async ({ page }) => {
   await page.goto('/?hum_page=usage');
   await expect(page.locator('.hum-chart')).toHaveCount(4);
   await expect(page.getByLabel('数据质量详情')).not.toBeVisible();
-  await page.getByLabel('使用分析说明').click();
+  const summary = page.getByLabel('采集状态与数据质量').locator('summary');
+  await summary.click();
   await expect(page.getByLabel('数据质量详情')).toBeVisible();
-  await expect(page.getByLabel('数据质量详情')).toContainText('非公司全集');
+  await expect(page.getByLabel('数据质量详情')).toContainText('当前数据库');
   await expect(page.getByLabel('数据质量详情')).toContainText('尚无采集记录');
   await expect(page.getByLabel('数据质量详情')).toContainText('缓存未知');
-  await expect(page.getByLabel('数据质量详情')).toContainText('辅助用量未采集，不代表为零');
+  await expect(page.getByLabel('数据质量详情')).toContainText('辅助用量未采集，不计为零');
   await expect(page.getByLabel('数据质量详情')).toContainText('接收时间');
-  await expect(page.locator('.hum-info[open] .hum-info-panel')).toHaveCSS('overflow-y', 'auto');
   await page.screenshot({ path: '../build/m3/quality.png', fullPage: true });
   await page.getByRole('button', { name: '刷新数据质量' }).click();
   await expect(page.getByLabel('数据质量详情')).toContainText('unavailable');
-  await page.keyboard.press('Escape');
+  await summary.click();
   await expect(page.getByLabel('数据质量详情')).not.toBeVisible();
 });
 

@@ -177,3 +177,8 @@
 @media(max-width:1150px) { .hum-root { gap:20px; padding:20px; } .hum-root .hum-sidebar { width:190px; } .hum-root .hum-kpis strong { font-size:26px; } .hum-root .hum-assignment { gap:12px; grid-template-columns:minmax(0,1fr) 150px minmax(0,1fr); } .hum-root .hum-assignment-list { padding:14px; } }
 @media(max-width:850px) { .hum-root .hum-grid { grid-template-columns:1fr; } .hum-root .hum-kpis { grid-template-columns:1fr; } .hum-root .hum-kpis>section { border-right:0; border-bottom:1px solid var(--hum-border); } .hum-root .hum-assignment { grid-template-columns:1fr; } .hum-root .hum-assignment-list { min-height:180px; } }
 @media(max-width:680px) { .hum-root { flex-direction:column; gap:12px; padding:14px; border-radius:14px; } .hum-root .hum-mobile-bar { display:flex; justify-content:space-between; align-items:center; } .hum-root .hum-sidebar { display:none; width:100%; margin:0; } .hum-root .hum-sidebar-open { display:block; } .hum-root .hum-page-heading { align-items:flex-start; flex-direction:column; gap:8px; } .hum-root .hum-date-controls { margin-left:0; } .hum-root .hum-card { padding:16px 10px; } .hum-root .hum-detail-grid { grid-template-columns:100px minmax(0,1fr); } .hum-root .hum-tabs button { padding:9px 14px; } .hum-root .hum-toolbar { gap:8px; } }
+.hum-root .hum-quality { margin:0 0 18px; padding:10px 14px; border:1px solid var(--hum-border); border-radius:12px; color:var(--hum-secondary); background:var(--hum-container); font-size:12px; line-height:1.7; }
+.hum-root .hum-quality>summary { cursor:pointer; }
+.hum-root .hum-quality-toggle { margin-left:12px; color:var(--hum-primary); }
+.hum-root .hum-quality[open] .hum-quality-toggle { display:none; }
+.hum-root .hum-quality>div { margin-top:10px; }

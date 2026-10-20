@@ -7,7 +7,7 @@ test('production IIFE renders, requests health, and remounts using host React', 
   await page.goto('/');
   expect((await (await response).json()).data_source).toBe('mock');
   await expect(page.getByRole('heading', { name: '概览', exact: true })).toBeVisible();
-  await expect(page.getByText('模拟数据 · M4 SQLite', { exact: true })).toBeVisible();
+  await expect(page.getByText('模拟数据', { exact: true })).toBeVisible();
   await expect(page.locator('.hum-chart')).toHaveCount(6);
   await expect(page.locator('#mock-root')).toHaveAttribute('data-registrations', '1');
   await page.getByRole('button', { name: '卸载插件' }).click();

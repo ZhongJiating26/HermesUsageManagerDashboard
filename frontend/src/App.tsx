@@ -21,7 +21,7 @@ export function PluginApp() {
     return () => { active = false; controller.abort(); };
   }, [attempt]);
 
-  if (health) return <Dashboard live={health.data_source === 'live'} collection={health.capabilities.collection} ready={health.capabilities.business_api && health.capabilities.storage === 'ready'} />;
+  if (health) return <Dashboard live={health.data_source === 'live'} ready={health.capabilities.business_api && health.capabilities.storage === 'ready'} />;
 
   return <section className="hum-root" aria-label="用量管理连接状态">
     <aside className="hum-sidebar">

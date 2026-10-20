@@ -41,20 +41,44 @@ def message_time(value):
 
 
 class HermesSessionContentProvider:
-    def __init__(self, factory=None, homes=None):
+    def __init__(self, factory=None, homes=None, *, local_admin=False):
         self.factory, self.homes = factory, homes
+        self.local_admin = local_admin
+
+    def local_scope(self, instance_id, profile_id):
+        from ..collector import context
+        from ..config import hermes_home
+        from ..events import key
+        home = hermes_home()
+        scope = context()
+        home_id = 'home-' + key(str(home))[:20]
+        # A home-derived ID remains tied to this directory when an administrator
+        # changes the instance label. Named profiles still require this instance.
+        if profile_id != home_id and (instance_id != scope.instance_id or profile_id != scope.profile_id):
+            raise unavailable()
+        import hermes_constants
+        resolver = getattr(hermes_constants, 'profile_name_for_home', lambda value: None)
+        profile = resolver(home)
+        if not profile:
+            profile = 'default' if home == (Path.home() / '.hermes').resolve() else scope.profile_id
+        return home, profile
 
     def read(self, instance_id, profile_id, session_id, offset=0, limit=100):
-        if os.environ.get('USAGE_MANAGER_SESSION_CONTENT') != '1':
+        enabled = os.environ.get('USAGE_MANAGER_SESSION_CONTENT')
+        if not (enabled == '1' if enabled is not None else self.local_admin):
             raise unavailable()
         try:
             homes = self.homes if self.homes is not None else json.loads(os.environ.get('USAGE_MANAGER_SESSION_HOMES', '{}'))
             home_value = homes.get(f'{instance_id}/{profile_id}')
+            local_profile = None
+            if home_value is None and self.homes is None and 'USAGE_MANAGER_SESSION_HOMES' not in os.environ and self.local_admin:
+                home, local_profile = self.local_scope(instance_id, profile_id)
+                home_value = str(home)
             if not isinstance(home_value, str) or not Path(home_value).expanduser().is_absolute():
                 raise unavailable()
             home = Path(home_value).expanduser().resolve(strict=True)
             profiles = json.loads(os.environ.get('USAGE_MANAGER_SESSION_PROFILES', '{}'))
-            expected_profile = profiles.get(f'{instance_id}/{profile_id}', profile_id)
+            expected_profile = profiles.get(f'{instance_id}/{profile_id}', local_profile or profile_id)
             if not isinstance(expected_profile, str) or not expected_profile.strip() or len(expected_profile) > 128:
                 raise unavailable()
             path = home / 'state.db'
@@ -85,7 +109,8 @@ class HermesSessionContentProvider:
             raise
         except Exception:
             raise unavailable() from None
-        tool_content = os.environ.get('USAGE_MANAGER_TOOL_CONTENT') == '1'
+        tool_setting = os.environ.get('USAGE_MANAGER_TOOL_CONTENT')
+        tool_content = tool_setting == '1' if tool_setting is not None else self.local_admin
         projected = []
         for index, message in enumerate(messages[:limit]):
             role = message.get('role')

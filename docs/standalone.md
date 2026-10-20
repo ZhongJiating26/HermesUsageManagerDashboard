@@ -117,7 +117,7 @@ service命令只新建~/.config/systemd/user/hermes-usage-manager.service，不�
 
 早期安装引导生成的`WorkingDirectory="绝对路径"`可能导致systemd报告bad unit file setting。运行路径均已是绝对路径，新生成unit省略该字段。新版setup会对完全匹配当前参数的旧生成unit先备份再修复；自定义内容或参数不同仍拒绝覆盖。启动后检查`systemctl --user is-active --quiet`，失败不再打印启动成功。已安装机器可先执行`sed -i.bak '/^WorkingDirectory=/d' ~/.config/systemd/user/hermes-usage-manager.service`，再daemon-reload、restart并检查is-active；此修复保留数据库、密码及其他服务字段。仍失败时读取status诊断，不能视作已启动。安装器已经启用插件后，install.sh不再重复enable或请求内置工具覆盖权限。
 
-停用独立入口：systemctl --user stop hermes-usage-manager.service。升级/卸载前也必须停止它；只停止Gateway和9119不再等于全部DB连接已停止。该服务配置不自动启用正文；需要正文时按configuration.md显式配置该服务的Profile映射和权限，谨慎维护私密环境文件。
+停用独立入口：systemctl --user stop hermes-usage-manager.service。升级/卸载前也必须停止它；只停止Gateway和9119不再等于全部DB连接已停止。按用户最新要求，独立管理员登录后可直接查看当前Hermes Home的对话详情，不再要求手填本机映射；其他Profile/Home仍按configuration.md显式配置。
 
 ## 5. Hooks、数据与权限
 
@@ -127,7 +127,7 @@ service命令只新建~/.config/systemd/user/hermes-usage-manager.service，不�
 - 会话8小时到期、进程重启全部失效，Cookie为HttpOnly/SameSite=Strict，HTTPS使用Secure；退出服务端撤销会话。登录每IP每分钟最多5次尝试，内存会话/限速表有上限，不依赖localStorage存令牌。
 - CLI固定单worker；会话与限速在进程内，不支持将多个独立服务实例置于负载均衡后冒充共享登录集群。
 - 业务API（包括health）均需登录；写入还需固定Origin和CSRF。Origin错误时检查public-url和实际访问URL，而不是关闭校验。
-- 正文与工具结果仍分别默认关闭，授权范围/只读/脱敏/审计不变，未知身份/缓存/费用不补零。
+- 管理员登录后默认可读当前Hermes Home的正文和工具结果；仍只读、分页、脱敏并记录审计，不读取工具参数。显式关闭变量或配置Profile映射仍优先，其他Home不自动开放；未知身份/缓存/费用不补零。
 - 空库初次没有图表数据是正常状态；有采集后才显示真实记录。采集degraded需结合心跳与队列，不把进程退出当成零用量。
 
 ## 6. 本次验证边界
