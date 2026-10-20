@@ -1,6 +1,6 @@
 name: hermes-usage-manager
 version: 0.6.0
-manifest_version: 2
+manifest_version: 1
 api_version: 1
 description: Hermes Usage Manager M4 metadata Hooks and read-only session adapter
 provides_hooks:

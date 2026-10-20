@@ -657,7 +657,7 @@ hermes-usage-manager/
 ```yaml
 name: hermes-usage-manager
 version: 0.1.0
-manifest_version: 2
+manifest_version: 1
 api_version: 1
 license: MIT
 # 仅使用真实支持的字段，版本约束如需声明需从实际 Hermes 验证

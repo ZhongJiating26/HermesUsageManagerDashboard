@@ -1,5 +1,11 @@
 # Hermes Usage Manager 兼容性记录
 
+## URL安装器清单版本修正（2026-10-20）
+
+用户回传`hermes plugins install`拒绝manifest_version 2，安装器上限为1。此前doctor和手工放置插件目录的验收没有覆盖URL安装器的版本门槛，不能据此判断安装器支持v2。官方同类问题见[NousResearch/hermes-agent #90451](https://github.com/NousResearch/hermes-agent/issues/90451)，加载器和安装器可能使用不同上限，直接升级不保证解决。
+
+本插件只注册五个观察Hook，不使用requires_plugins/python_dependencies/config_schema等v2专属声明。现在plugin.yaml声明manifest_version: 1，api_version: 1保留，运行代码与Hook不变；README示例同步，并在兼容测试中约束清单不能再次超出v1安装器上限。本地测试通过不代表已在用户目标机完成URL重装；本轮未升级Hermes或连接服务器。
+
 ## 0.6.0 独立端口：用户授权变更，本地通过
 
 用户明确选择独立端口仅显示平台，调整此前嵌入限制：原生IIFE继续复用宿主React且无React打包，独立入口单独构建React/ReactDOM并带自己的管理员登录；两者共用业务API/SQLite，五Hook与schema不变。153项Python、32项原生浏览器、4项独立浏览器、3项IIFE共192项通过，类型/lint/双构建通过；独立登录/写入CSRF/会话失效/包内运行得到本地验证。0.6.0实际Hermes及Linux服务启动仍待当前测试机回传，不把0.5.1实测扩大为新入口通过；新服务器免除决定不变。详见standalone.md、standalone-report.md。

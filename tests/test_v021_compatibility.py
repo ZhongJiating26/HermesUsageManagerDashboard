@@ -17,6 +17,8 @@ def test_v021_declared_and_registered_hooks_match_without_missing_auxiliary():
     import yaml
     root = Path(__file__).resolve().parents[1]
     manifest = yaml.safe_load((root / 'plugin.yaml').read_text(encoding='utf-8'))
+    # Released installers may cap at v1 even when their runtime accepts v2.
+    assert manifest.get('manifest_version', 1) <= 1
     valid = {'pre_llm_call', 'post_api_request', 'api_request_error', 'post_tool_call', 'on_session_end'}
     registered = []
     def register_hook(name, callback):

@@ -2,6 +2,7 @@
 
 ## 未发布 — 简化安装引导
 
+- 将plugin.yaml的manifest_version声明降为1，兼容仅支持v1的Hermes安装器；插件未使用必须依赖v2的字段，api_version与五Hook保持不变。此前doctor/手动安装验收不能代替URL安装路径验证。
 - 新增Linux `install.sh`，自动定位Hermes的Python并调用setup，首次输入两次密码即可创建私有数据目录、保存配置、生成并启动用户systemd服务。
 - Hooks和Web入口共用持久化数据库/采集配置，无需手动export；环境变量仍优先，未执行引导时采集默认关闭，不修改Gateway或网络配置。
 - setup可重复运行并保留密码与业务数据，已有不同服务配置拒绝覆盖；非systemd环境可setup后serve。已加入发行包库存，尚未在目标Hermes服务器实机验证。
