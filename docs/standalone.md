@@ -111,6 +111,8 @@ service命令只新建~/.config/systemd/user/hermes-usage-manager.service，不�
 
 已有unit时保留并审查，不重复运行service强行覆盖；重装到相同插件路径后可复用原unit。完整卸载前使用systemctl --user disable --now hermes-usage-manager.service，避免下次登录尝试启动已移出的代码。ops快照包含插件代码/业务DB，不包含插件外的独立凭据或systemd unit；迁移机器时这些文件须另作私密备份，不能上传Git或混入公开zip。
 
+早期安装引导生成的`WorkingDirectory="绝对路径"`可能导致systemd报告bad unit file setting。运行路径均已是绝对路径，新生成unit省略该字段。新版setup会对完全匹配当前参数的旧生成unit先备份再修复；自定义内容或参数不同仍拒绝覆盖。启动后检查`systemctl --user is-active --quiet`，失败不再打印启动成功。已安装机器可先执行`sed -i.bak '/^WorkingDirectory=/d' ~/.config/systemd/user/hermes-usage-manager.service`，再daemon-reload、restart并检查is-active；此修复保留数据库、密码及其他服务字段。仍失败时读取status诊断，不能视作已启动。安装器已经启用插件后，install.sh不再重复enable或请求内置工具覆盖权限。
+
 停用独立入口：systemctl --user stop hermes-usage-manager.service。升级/卸载前也必须停止它；只停止Gateway和9119不再等于全部DB连接已停止。该服务配置不自动启用正文；需要正文时按configuration.md显式配置该服务的Profile映射和权限，谨慎维护私密环境文件。
 
 ## 5. Hooks、数据与权限

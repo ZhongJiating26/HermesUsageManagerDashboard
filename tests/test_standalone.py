@@ -198,6 +198,7 @@ def test_systemd_unit_has_no_secrets_and_quotes_paths_safely(tmp_path):
     assert 'data with space%%' in text
     assert 'USAGE_MANAGER_DB_PATH=' in text
     assert 'UMask=0077' in text
+    assert 'WorkingDirectory=' not in text
     assert PASSWORD not in text
     assert 'hermes-gateway' not in text
     assert '--allow-http' not in text

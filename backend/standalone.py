@@ -215,7 +215,7 @@ def create_app(auth_file, database, public_url, allow_http=False, assets=None):
     return application
 
 
-def service_text(auth_file, database, host, port, public_url, allow_http=False):
+def service_text(auth_file, database, host, port, public_url, allow_http=False, *, _legacy=False):
     def quote(value, escape_dollar=False):
         value = str(value)
         if any(character in value for character in ('\n', '\r', '\x00')):
@@ -226,7 +226,10 @@ def service_text(auth_file, database, host, port, public_url, allow_http=False):
     command = [sys.executable, ROOT / 'standalone.py', 'serve', '--auth-file', auth_file, '--host', host, '--port', port, '--public-url', public_url]
     if allow_http:
         command.append('--allow-http')
-    return '\n'.join(['[Unit]', 'Description=Hermes Usage Manager independent web entry', 'After=network.target', '', '[Service]', 'Type=simple', 'WorkingDirectory=' + quote(ROOT), 'Environment=' + quote('USAGE_MANAGER_DB_PATH=' + str(database)), 'Environment=' + quote('HERMES_HOME=' + str(hermes_home())), 'ExecStart=' + ' '.join(quote(value, True) for value in command), 'Restart=on-failure', 'RestartSec=5', 'UMask=0077', 'NoNewPrivileges=true', '', '[Install]', 'WantedBy=default.target', ''])
+    working_directory = ['WorkingDirectory=' + quote(ROOT)] if _legacy else []
+    # All runtime paths are absolute; WorkingDirectory is unnecessary and older
+    # systemd versions treat its surrounding quotes as part of a relative path.
+    return '\n'.join(['[Unit]', 'Description=Hermes Usage Manager independent web entry', 'After=network.target', '', '[Service]', 'Type=simple', *working_directory, 'Environment=' + quote('USAGE_MANAGER_DB_PATH=' + str(database)), 'Environment=' + quote('HERMES_HOME=' + str(hermes_home())), 'ExecStart=' + ' '.join(quote(value, True) for value in command), 'Restart=on-failure', 'RestartSec=5', 'UMask=0077', 'NoNewPrivileges=true', '', '[Install]', 'WantedBy=default.target', ''])
 
 
 def setup_installation(args, database, origin):
@@ -259,7 +262,16 @@ def setup_installation(args, database, origin):
         text = service_text(auth, database, args.host, args.port, origin, args.allow_http)
         unit.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         if unit.exists():
-            if unit.read_text(encoding='utf-8') != text:
+            previous = unit.read_text(encoding='utf-8')
+            legacy = service_text(auth, database, args.host, args.port, origin, args.allow_http, _legacy=True)
+            if previous == legacy:
+                backup = unit.with_name(unit.name + '.before-fix-' + secrets.token_hex(4))
+                descriptor = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(descriptor, 'w', encoding='utf-8', newline='\n') as output:
+                    output.write(previous)
+                unit.write_text(text, encoding='utf-8', newline='\n')
+                print(f'已修复旧版服务配置，原文件保存在：{backup}')
+            elif previous != text:
                 raise ValueError('Existing service settings differ; inspect the existing unit before changing it')
         else:
             descriptor = os.open(unit, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -267,6 +279,7 @@ def setup_installation(args, database, origin):
                 output.write(text)
         subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True)
         subprocess.run(['systemctl', '--user', 'enable', '--now', 'hermes-usage-manager.service'], check=True)
+        subprocess.run(['systemctl', '--user', 'is-active', '--quiet', 'hermes-usage-manager.service'], check=True)
         print('用量管理后台服务已启动。')
 
 

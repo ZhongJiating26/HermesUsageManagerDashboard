@@ -62,7 +62,7 @@ def test_setup_systemd_is_explicit_repeatable_and_reports_failure(installation, 
     unit = standalone.Path.home() / '.config/systemd/user/hermes-usage-manager.service'
     before = unit.read_bytes()
     assert 'HERMES_HOME=' in before.decode()
-    assert calls == [['systemctl', '--user', 'daemon-reload'], ['systemctl', '--user', 'enable', '--now', 'hermes-usage-manager.service']]
+    assert calls == [['systemctl', '--user', 'daemon-reload'], ['systemctl', '--user', 'enable', '--now', 'hermes-usage-manager.service'], ['systemctl', '--user', 'is-active', '--quiet', 'hermes-usage-manager.service']]
     standalone.main(['setup', '--start-service'])
     assert unit.read_bytes() == before
     unit.write_text('custom service', encoding='utf-8')
@@ -102,3 +102,35 @@ def test_core_database_override_rejected_before_setup(installation, monkeypatch)
         standalone.main(['setup'])
     assert not core.exists()
     assert not config.settings_path().exists()
+
+
+def test_inactive_service_never_reports_success_even_if_enable_succeeds(installation, monkeypatch, capsys):
+    monkeypatch.setattr(standalone.sys, 'platform', 'linux')
+    def run(args, **kwargs):
+        if 'is-active' in args:
+            raise standalone.subprocess.CalledProcessError(3, args)
+    monkeypatch.setattr(standalone.subprocess, 'run', run)
+    with pytest.raises(SystemExit) as error:
+        standalone.main(['setup', '--start-service'])
+    captured = capsys.readouterr()
+    assert error.value.code == 1
+    assert '后台服务已启动' not in captured.out
+    assert 'systemd' in captured.err
+
+
+def test_exact_legacy_unit_is_backed_up_and_repaired_without_resetting_password(installation, monkeypatch):
+    monkeypatch.setattr(standalone.sys, 'platform', 'linux')
+    monkeypatch.setattr(standalone.subprocess, 'run', lambda *args, **kwargs: None)
+    standalone.main(['setup', '--start-service'])
+    auth = installation / 'usage-manager-data/standalone-auth.json'
+    credentials = auth.read_bytes()
+    unit = standalone.Path.home() / '.config/systemd/user/hermes-usage-manager.service'
+    legacy = standalone.service_text(auth, config.database_path(), '127.0.0.1', 9120, 'http://127.0.0.1:9120', _legacy=True)
+    unit.write_text(legacy, encoding='utf-8')
+    monkeypatch.setattr(standalone.getpass, 'getpass', lambda prompt: pytest.fail('Do not reset existing credentials'))
+    standalone.main(['setup', '--start-service'])
+    assert 'WorkingDirectory=' not in unit.read_text()
+    backups = list(unit.parent.glob('hermes-usage-manager.service.before-fix-*'))
+    assert len(backups) == 1
+    assert backups[0].read_text(encoding='utf-8') == legacy
+    assert auth.read_bytes() == credentials
