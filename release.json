@@ -1,7 +1,7 @@
 {
   "files": {
-    "CHANGELOG.md": "0ae40b6b9b2348c1ad51f734ce61f9f4f9e12dbb97338bad6f72f184285bb20e",
-    "README.md": "094ecfc2623d3ce7313105fd6b7f43cf089dc6f44737fd84dfcd11a6148e7aba",
+    "CHANGELOG.md": "96d1c70b94b4c038d3209b9cd8c844189029446ae00eea0cb5882c44c9153f66",
+    "README.md": "6dae0ee9327e672adcb3011fba9bf8836c5c31da864fa6b8bd47d535f826d0f2",
     "__init__.py": "b5673fe796091f6d578484ad6d6725332a44d57f9307d45ddcae212715627029",
     "backend/__init__.py": "ed1fafd50ce033cf0aa3abe4488c7e8063fdd18e5b47a845e22ff08dc8f5e8c7",
     "backend/adapters/__init__.py": "d8370d1d4d8b5f72c26ef0fd57681beb38a88092029b22e6d344f0244ff8cc55",
@@ -25,7 +25,7 @@
     "backend/responses.py": "f1a63a5aaa44e43106ed865b885ff23ca05aa643dcb3757f8de297f28fb5dd56",
     "backend/schemas.py": "deee6eca0a9293d7675b5ea0ec234575678ea236939ece7951d77e2a07682dfe",
     "backend/security.py": "7c416f186113f8bddb7ccd9652054897255388283894749860d7ee456ac50823",
-    "backend/standalone.py": "a9b8af5627907a57fc0b5e7414588f660fbd1238f7d68f84d87eca30ac47e283",
+    "backend/standalone.py": "ef0aea81cf4c607ef2b17e522890b1e951bde04cfc555de39181baee5cabca79",
     "dashboard/dist/THIRD_PARTY_NOTICES.txt": "fe7869aa535a1fc40b81c9bcb7fd1db203356a6ce6b200499dd873a682893c62",
     "dashboard/dist/assets/material-symbols-XUHUDEAK.ttf": "f4d212199bbe8c75f2a305cadbc9b0d858aeef3139ba64246cdec8d3e2a90106",
     "dashboard/dist/index.js": "87337be4ac61ac5d0e9008b68c0a9de864b16457acf64abb78b29fe690e3c2d3",
@@ -52,10 +52,10 @@
     "docs/m4-051-recovery.md": "26d245d510241f61ee1eb83e9460cc03e78e94996d646310d5b3481cedd40740",
     "docs/m4-acceptance.md": "75febdcf10d1b06105c8c66af6bcf2b04fb22d39e7eb951383af328d8e0116c1",
     "docs/m4-report.md": "e6a6ae626f8427b22a39abd6a65fa1d17c643779eb2e12145bf9dee888dc9d1f",
-    "docs/security-review.md": "095a9427b386742ce4cbdd41838aec69b71cddc63572d1c9d4a4596319409cf2",
+    "docs/security-review.md": "c7053693cd3e4eec5d5cd8ff0df4b44817545e50278d329a358bc7baaedecf42",
     "docs/standalone-report.md": "99baa39326c5c8fb983f0b3e6bac5cde7e98bf57f214cb61a6761f4dd107a72c",
-    "docs/standalone.md": "e2a89363eed7e03a48d8c6f97a7d362442b41705577b1bf6998de13658fb16cd",
-    "install.sh": "4b02b734909e81ef5706cc73576f7dcf67254f8c84992767dfc18e575d209a9c",
+    "docs/standalone.md": "b1db1fab46d10e764697ea58850a386f8ac77fca88a5b944a02a40cf382a15a4",
+    "install.sh": "d825def811f1144a9014941449b93a180a8b5c3cca11c190c8cb14e653af783a",
     "ops/__init__.py": "92c730bb1cfe93d4bebd27e549d4474add59269743aa91800f0a74ad4b929ee3",
     "ops/manage.py": "f350e8bd901b28fa072faa3bdff42bc55f8122469de4c1bd65e8f3f0162e8b37",
     "plugin.yaml": "63dce99fee8873552b3b7ccbf02e0b7497f11ee52b78d18105f498f939ed6db4",
@@ -72,7 +72,7 @@
   "name": "hermes-usage-manager",
   "release_status": "candidate",
   "source_dirty": false,
-  "source_revision": "5fbe6b1043440cf4d915d2a4f529c04f287898e5",
+  "source_revision": "6c9d0da50e4fa8329c50aa73d052b9bce6dc8197",
   "source_tag": null,
   "version": "0.6.0"
 }

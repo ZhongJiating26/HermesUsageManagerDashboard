@@ -11,7 +11,7 @@ hermes plugins install https://github.com/ZhongJiating26/HermesUsageManagerDashb
 bash ~/.hermes/plugins/hermes-usage-manager/install.sh
 ```
 
-Linux用户systemd环境执行第二条安装引导后，只需输入两次管理员密码；脚本自动寻找Hermes的Python、创建私有数据目录、保存数据库与采集配置，并启动独立后台服务。默认访问http://127.0.0.1:9120；已有密码、数据和相同服务配置会保留。最后按原方式重启Gateway使配置生效，无需手动export变量；已有Gateway环境变量仍优先，旧DB配置需先调整。不会修改Gateway或开放公网。完整说明、非systemd环境及自定义配置见[独立端口使用说明](docs/standalone.md)。安装引导与0.6.0独立入口仍待目标机验证，以下M4验收是0.5.1历史基线。
+Linux用户systemd环境执行第二条安装引导后，只需输入两次管理员密码；脚本自动寻找Hermes的Python、创建私有数据目录、保存数据库与采集配置，并启动独立后台服务。按用户要求默认监听0.0.0.0:9120，浏览器直接访问http://服务器IP:9120，无需预填公网或内网IP；仍需管理员密码，HTTP本身不加密。已有密码和数据会保留，旧版自动生成的本机监听服务会先备份再更新；自定义服务仍保留并提示检查。最后按原方式重启Gateway使采集配置生效，无需手动export变量；已有Gateway环境变量仍优先，旧DB配置需先调整。云安全组/防火墙需允许9120，不自动修改它们。完整说明、仅本机监听和HTTPS配置见[独立端口使用说明](docs/standalone.md)。本次直接IP访问仍待目标机验证，以下M4验收是0.5.1历史基线。
 
 ## 原始开发规格与历史验收
 

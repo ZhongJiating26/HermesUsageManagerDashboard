@@ -2,6 +2,7 @@ import argparse
 import getpass
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 import secrets
@@ -111,12 +112,26 @@ class Sessions:
             self.values.pop(hashlib.sha256(token.encode()).hexdigest(), None)
 
 
+def direct_request_origin(request):
+    """Allow IP-address hosts, with same-origin checks per browser request."""
+    if len(request.headers.getlist('host')) != 1:
+        raise ValueError('Exactly one Host header is required')
+    origin = canonical_origin(f'{request.url.scheme}://{request.headers["host"]}')
+    hostname = urlsplit(origin).hostname
+    if hostname != 'localhost':
+        ipaddress.ip_address(hostname)  # DNS names require an explicit public URL.
+    return origin
+
+
 def create_app(auth_file, database, public_url, allow_http=False, assets=None):
-    origin = canonical_origin(public_url)
-    parsed = urlsplit(origin)
-    secure = parsed.scheme == 'https'
-    if not secure and parsed.hostname not in {'127.0.0.1', 'localhost', '::1'} and not allow_http:
-        raise ValueError('Remote access requires HTTPS; --allow-http is for isolated testing only')
+    direct_ip = public_url is None
+    if direct_ip and not allow_http:
+        raise ValueError('Direct IP access requires --allow-http')
+    origin = canonical_origin(public_url) if public_url else None
+    parsed = urlsplit(origin) if origin else None
+    secure = parsed.scheme == 'https' if parsed else False
+    if parsed and not secure and parsed.hostname not in {'127.0.0.1', 'localhost', '::1'} and not allow_http:
+        raise ValueError('Remote access requires HTTPS or explicit --allow-http for unencrypted access')
     salt, expected = read_auth(auth_file)
     if Path(database).resolve().name.casefold() == 'state.db':
         raise ValueError('Do not use the Hermes core state.db as a usage database')
@@ -129,12 +144,13 @@ def create_app(auth_file, database, public_url, allow_http=False, assets=None):
     application = FastAPI(title='Hermes Usage Manager', docs_url=None, redoc_url=None, openapi_url=None)
     application.state.hum_runtime = runtime
     application.state.hum_sessions = sessions
-    application.add_middleware(TrustedHostMiddleware, allowed_hosts=[parsed.hostname])
+    if parsed:
+        application.add_middleware(TrustedHostMiddleware, allowed_hosts=[parsed.hostname])
 
     def check_origin(request):
         supplied = request.headers.get('origin', '')
         try:
-            valid = canonical_origin(supplied) == origin
+            valid = canonical_origin(supplied) == (request.state.hum_origin if direct_ip else origin)
         except ValueError:
             valid = False
         if not valid:
@@ -153,6 +169,11 @@ def create_app(auth_file, database, public_url, allow_http=False, assets=None):
 
     @application.middleware('http')
     async def security_headers(request, call_next):
+        if direct_ip:
+            try:
+                request.state.hum_origin = direct_request_origin(request)
+            except ValueError:
+                return JSONResponse({'error': {'code': 'INVALID_HOST', 'message': '请使用服务器IP访问，域名访问需配置public-url'}}, status_code=400)
         response = await call_next(request)
         response.headers['Cache-Control'] = 'no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -223,7 +244,9 @@ def service_text(auth_file, database, host, port, public_url, allow_http=False, 
         value = value.replace('\\', '\\\\').replace('"', '\\"').replace('%', '%%')
         return '"' + (value.replace('$', '$$') if escape_dollar else value) + '"'
 
-    command = [sys.executable, ROOT / 'standalone.py', 'serve', '--auth-file', auth_file, '--host', host, '--port', port, '--public-url', public_url]
+    command = [sys.executable, ROOT / 'standalone.py', 'serve', '--auth-file', auth_file, '--host', host, '--port', port]
+    if public_url:
+        command += ['--public-url', public_url]
     if allow_http:
         command.append('--allow-http')
     working_directory = ['WorkingDirectory=' + quote(ROOT)] if _legacy else []
@@ -253,7 +276,8 @@ def setup_installation(args, database, origin):
         descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, 'w', encoding='utf-8') as output:
             json.dump({'format': 1, 'database': str(database), 'auth_file': str(auth), 'collection': True}, output, indent=2)
-    print(f'数据库：{database}\n配置：{path}\n访问地址：{origin}')
+    address = origin or f'http://服务器IP:{args.port}（公网或内网IP均可）'
+    print(f'数据库：{database}\n配置：{path}\n访问地址：{address}')
     print('元数据采集配置已保存；请按原运行方式重启 Gateway，让插件加载配置。')
     if args.start_service:
         if sys.platform != 'linux':
@@ -264,13 +288,17 @@ def setup_installation(args, database, origin):
         if unit.exists():
             previous = unit.read_text(encoding='utf-8')
             legacy = service_text(auth, database, args.host, args.port, origin, args.allow_http, _legacy=True)
-            if previous == legacy:
+            old_local = {
+                service_text(auth, database, '127.0.0.1', args.port, f'http://127.0.0.1:{args.port}', _legacy=old)
+                for old in (False, True)
+            }
+            if previous != text and (previous == legacy or previous in old_local):
                 backup = unit.with_name(unit.name + '.before-fix-' + secrets.token_hex(4))
                 descriptor = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                 with os.fdopen(descriptor, 'w', encoding='utf-8', newline='\n') as output:
                     output.write(previous)
                 unit.write_text(text, encoding='utf-8', newline='\n')
-                print(f'已修复旧版服务配置，原文件保存在：{backup}')
+                print(f'已更新旧版服务配置，原文件保存在：{backup}')
             elif previous != text:
                 raise ValueError('Existing service settings differ; inspect the existing unit before changing it')
         else:
@@ -278,7 +306,8 @@ def setup_installation(args, database, origin):
             with os.fdopen(descriptor, 'w', encoding='utf-8', newline='\n') as output:
                 output.write(text)
         subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True)
-        subprocess.run(['systemctl', '--user', 'enable', '--now', 'hermes-usage-manager.service'], check=True)
+        subprocess.run(['systemctl', '--user', 'enable', 'hermes-usage-manager.service'], check=True)
+        subprocess.run(['systemctl', '--user', 'restart', 'hermes-usage-manager.service'], check=True)
         subprocess.run(['systemctl', '--user', 'is-active', '--quiet', 'hermes-usage-manager.service'], check=True)
         print('用量管理后台服务已启动。')
 
@@ -291,7 +320,7 @@ def main(argv=None):
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=9120)
     parser.add_argument('--public-url')
-    parser.add_argument('--allow-http', action='store_true', help='Allow remote plain HTTP for isolated testing only')
+    parser.add_argument('--allow-http', action='store_true', help='Allow unencrypted HTTP, including direct access by server IP')
     args = parser.parse_args(argv)
     try:
         if args.start_service and args.action != 'setup':
@@ -307,18 +336,19 @@ def main(argv=None):
         database = database_path()
         if not 1 <= args.port <= 65535:
             raise ValueError('Port must be between 1 and 65535')
-        if args.host not in {'127.0.0.1', 'localhost', '::1'} and not args.public_url:
-            raise ValueError('Remote binding requires an explicit --public-url')
+        remote = args.host not in {'127.0.0.1', 'localhost', '::1'}
+        if remote and not args.public_url and not args.allow_http:
+            raise ValueError('Remote binding requires --public-url or --allow-http for direct IP access')
+        origin = canonical_origin(args.public_url) if args.public_url else (None if remote else f'http://{args.host if args.host != "::1" else "[::1]"}:{args.port}')
         if args.action == 'setup':
-            origin = canonical_origin(args.public_url or f'http://{args.host if args.host != "::1" else "[::1]"}:{args.port}')
             setup_installation(args, database, origin)
             return
-        application = create_app(args.auth_file, database, args.public_url or f'http://{args.host if args.host != "::1" else "[::1]"}:{args.port}', args.allow_http)
+        application = create_app(args.auth_file, database, origin, args.allow_http)
         if args.action == 'service':
             if sys.platform != 'linux':
                 raise ValueError('User systemd service generation requires Linux')
             path = private_path(Path.home() / '.config/systemd/user/hermes-usage-manager.service')
-            text = service_text(args.auth_file, database, args.host, args.port, args.public_url or f'http://{args.host if args.host != "::1" else "[::1]"}:{args.port}', args.allow_http)
+            text = service_text(args.auth_file, database, args.host, args.port, origin, args.allow_http)
             path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(descriptor, 'w', encoding='utf-8') as output:
