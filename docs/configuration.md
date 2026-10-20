@@ -4,6 +4,10 @@
 
 ## 基础配置
 
+推荐先执行安装目录的`bash install.sh`：自动保存当前Hermes Home下`plugin-data/hermes-usage-manager/settings.json`，Hooks、原生Dashboard与独立入口共用其中的数据库路径，元数据采集随引导显式启用。没有设置文件且没有采集环境变量时仍默认关闭采集。`USAGE_MANAGER_DB_PATH`和`USAGE_MANAGER_COLLECTION`显式环境变量优先（包括值0），实例ID继续自动生成，无需手动配置。更改设置后按原运行方式重启相关进程。独立凭据路径也存入设置文件，重复setup保留数据及密码。其他权限变量不因安装引导而启用。
+
+以下是仍支持的手动环境变量方式；已有服务若设置过旧值，需要先调整，否则会覆盖安装引导保存的默认配置。
+
 在启动Dashboard和会话的各终端分别设置；新终端不会继承其他终端的export，进程启动后修改父终端也不会更新运行进程。不要把下面示例自动覆盖到现有服务环境；升级保持原DB和Instance ID。
 
 ```bash

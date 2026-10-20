@@ -46,6 +46,7 @@ def test_release_is_reproducible_and_contains_no_development_runtime(artifact):
     assert len(result['source_revision']) == 40
     assert isinstance(result['source_dirty'], bool)
     assert 'ops/manage.py' in result['files']
+    assert {'install.sh', 'backend/config.py'} <= result['files'].keys()
     assert not any(name.startswith(('frontend/', 'dev/', 'fixtures/', 'tests/')) or name.endswith(('.db', '.pyc', '.sqlite3')) for name in result['files'])
     for line in path.with_suffix('.sha256').read_text().splitlines():
         checksum, name = line.split('  ')

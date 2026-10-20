@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from .adapters.hooks import HOOKS, HookContext, Normalizer, identifier
 from .db import Store, now
+from .config import collection_enabled, database_path
 from .events import ModelEvent, ToolEvent, ingest_model, ingest_tool, key
 
 logger = logging.getLogger('hermes-usage-manager')
@@ -27,7 +28,7 @@ def context():
     home = hermes_constants.get_hermes_home().expanduser().resolve()
     profile_name = getattr(hermes_constants, 'profile_name_for_home', lambda value: None)
     profile = os.environ.get('USAGE_MANAGER_PROFILE_ID') or profile_name(home) or 'home-' + key(str(home))[:20]
-    path = os.environ.get('USAGE_MANAGER_DB_PATH') or str(home / 'plugin-data/hermes-usage-manager/usage.sqlite3')
+    path = database_path()
     candidate = Path(path).expanduser()
     if not candidate.is_absolute():
         raise ValueError('INVALID_DB_PATH')
@@ -207,9 +208,9 @@ class Dispatcher:
 
     def callback(self, name, payload=None, **fields):
         payload = fields if payload is None else payload
-        if not (self.enabled if self.enabled is not None else os.environ.get('USAGE_MANAGER_COLLECTION') == '1'):
-            return None
         try:
+            if not (self.enabled if self.enabled is not None else collection_enabled()):
+                return None
             scope = self.context_factory()
             with self.lock:
                 collector = self.collectors.get(scope.db_path)

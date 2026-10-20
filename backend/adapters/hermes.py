@@ -1,18 +1,18 @@
 import os
-from pathlib import Path
 
 from fastapi import HTTPException
 
+from ..config import database_path, settings
+
 
 def storage_path():
-    configured = os.environ.get("USAGE_MANAGER_DB_PATH")
-    if configured:
-        return Path(configured).expanduser()
+    if os.environ.get('USAGE_MANAGER_DB_PATH') or settings().get('database'):
+        return database_path()
     try:
         from plugins.plugin_storage import plugin_data_dir
     except ImportError as error:
-        raise RuntimeError("Hermes plugin_data_dir unavailable; configure a secure absolute USAGE_MANAGER_DB_PATH") from error
-    return plugin_data_dir("hermes-usage-manager") / "usage.sqlite3"
+        raise RuntimeError('Hermes storage unavailable; run the plugin installation setup') from error
+    return plugin_data_dir('hermes-usage-manager') / 'usage.sqlite3'
 
 
 def require_dashboard_admin(request):

@@ -6,10 +6,31 @@
 
 ## 1. 安装与版本检查
 
+### 推荐：两条命令完成安装与初始化（Linux 用户 systemd）
+
+```bash
+hermes plugins install https://github.com/ZhongJiating26/HermesUsageManagerDashboard.git
+bash ~/.hermes/plugins/hermes-usage-manager/install.sh
+```
+
+安装引导自动检测Hermes命令的Python解释器（无法识别时检查Hermes目录内的venv），首次只需交互输入两次管理员密码。自动创建私有目录及数据库、保存元数据采集配置、生成并启用用户systemd服务，默认仅监听127.0.0.1:9120。脚本须来自包含install.sh的新代码；未同步的旧仓库版本不具备此功能。不会修改Gateway或防火墙。
+
+最后按原启动方式重启Gateway以加载新版插件。无需在终端或Gateway服务手动设置数据库、实例ID、采集变量；实例ID继续使用现有自动生成规则。显式环境变量仍优先，已有Gateway若配置过旧数据库路径或关闭采集，应先调整对应旧配置。多Profile需分别运行对应Home的引导，或显式配置共享DB，不能自动跨Profile汇聚。
+
+默认数据库为当前Hermes Home下的`plugin-data/hermes-usage-manager/usage.sqlite3`；共享设置保存在同目录的`settings.json`，凭据为`usage-manager-data/standalone-auth.json`。Home优先使用Hermes自身解析函数，独立环境则使用HERMES_HOME或~/.hermes；systemd保存解析后的Home。数据库和凭据不在源码目录中。重复运行保留已有密码和数据；已有unit完全相同可复用，不同则拒绝覆盖。
+
+自定义监听参数可以直接追加，例如HTTPS代理入口：
+
+```bash
+bash ~/.hermes/plugins/hermes-usage-manager/install.sh --public-url https://usage.example.com
+```
+
+无systemd的环境使用Hermes实际Python执行`standalone.py setup`初始化，再执行`standalone.py serve`前台启动；两者都不再要求手动指定DB。setup不带--start-service时不会创建或启动系统服务。systemd失败会保留已经完成的配置并返回失败，可修复后重跑；仅安装插件或注册Hooks不会自动监听。下面保留手动分步命令供自定义部署使用。
+
 新服务器首次安装：
 
 ```bash
-hermes plugins install https://github.com/ZJTatTopsun/HermesUsageManagerDashboard.git
+hermes plugins install https://github.com/ZhongJiating26/HermesUsageManagerDashboard.git
 hermes plugins doctor --ci hermes-usage-manager
 ```
 

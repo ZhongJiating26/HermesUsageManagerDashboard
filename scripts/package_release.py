@@ -66,14 +66,14 @@ def collect(root):
         raise ValueError('Standalone entry must provide its own React runtime')
     if any(output.get('imports') for path, output in standalone['outputs'].items() if path.endswith('.js')):
         raise ValueError('Unresolved standalone JavaScript imports')
-    roots = ['plugin.yaml', '__init__.py', 'standalone.py', 'pyproject.toml', 'README.md', 'CHANGELOG.md']
+    roots = ['plugin.yaml', '__init__.py', 'standalone.py', 'install.sh', 'pyproject.toml', 'README.md', 'CHANGELOG.md']
     paths = [root / name for name in roots]
     for directory in ('dashboard', 'backend', 'docs', 'ops', 'standalone'):
         paths.extend(path for path in (root / directory).rglob('*') if path.is_file() and '__pycache__' not in path.parts)
     files = {}
     for path in paths:
         relative = path.relative_to(root).as_posix()
-        if path.is_symlink() or path.suffix not in {'.py', '.sql', '.json', '.js', '.css', '.html', '.ttf', '.txt', '.md', '.yaml', '.toml'} or any(part.startswith('.') for part in Path(relative).parts):
+        if path.is_symlink() or path.suffix not in {'.py', '.sh', '.sql', '.json', '.js', '.css', '.html', '.ttf', '.txt', '.md', '.yaml', '.toml'} or any(part.startswith('.') for part in Path(relative).parts):
             raise ValueError('Unexpected or sensitive runtime file')
         files[relative] = path.read_bytes()
     for field in ('entry', 'css', 'api'):

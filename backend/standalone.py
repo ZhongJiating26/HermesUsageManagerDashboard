@@ -6,6 +6,7 @@ import json
 import os
 import secrets
 import sqlite3
+import subprocess
 import sys
 import time
 from collections import OrderedDict
@@ -22,6 +23,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import api
 from .db import Store
+from .config import database_path, hermes_home, settings, settings_path
 from .security import Principal
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -224,19 +226,64 @@ def service_text(auth_file, database, host, port, public_url, allow_http=False):
     command = [sys.executable, ROOT / 'standalone.py', 'serve', '--auth-file', auth_file, '--host', host, '--port', port, '--public-url', public_url]
     if allow_http:
         command.append('--allow-http')
-    return '\n'.join(['[Unit]', 'Description=Hermes Usage Manager independent web entry', 'After=network.target', '', '[Service]', 'Type=simple', 'WorkingDirectory=' + quote(ROOT), 'Environment=' + quote('USAGE_MANAGER_DB_PATH=' + str(database)), 'ExecStart=' + ' '.join(quote(value, True) for value in command), 'Restart=on-failure', 'RestartSec=5', 'UMask=0077', 'NoNewPrivileges=true', '', '[Install]', 'WantedBy=default.target', ''])
+    return '\n'.join(['[Unit]', 'Description=Hermes Usage Manager independent web entry', 'After=network.target', '', '[Service]', 'Type=simple', 'WorkingDirectory=' + quote(ROOT), 'Environment=' + quote('USAGE_MANAGER_DB_PATH=' + str(database)), 'Environment=' + quote('HERMES_HOME=' + str(hermes_home())), 'ExecStart=' + ' '.join(quote(value, True) for value in command), 'Restart=on-failure', 'RestartSec=5', 'UMask=0077', 'NoNewPrivileges=true', '', '[Install]', 'WantedBy=default.target', ''])
+
+
+def setup_installation(args, database, origin):
+    """Explicit first-run setup; never run from Hook registration."""
+    path = private_path(settings_path())
+    existing = settings()
+    if existing and (existing.get('database') != str(database) or existing.get('auth_file') != str(args.auth_file)):
+        raise ValueError('Existing settings use different paths; keep the original paths or inspect settings.json')
+    auth = private_path(args.auth_file)
+    if auth.exists():
+        read_auth(auth)
+        print('保留已有管理员密码。')
+    else:
+        password = getpass.getpass('设置用量管理管理员密码（至少12字符）: ')
+        if password != getpass.getpass('再次输入密码: '):
+            raise ValueError('Passwords do not match')
+        initialize_auth(auth, password)
+    create_app(auth, database, origin, args.allow_http)
+    if not existing:
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as output:
+            json.dump({'format': 1, 'database': str(database), 'auth_file': str(auth), 'collection': True}, output, indent=2)
+    print(f'数据库：{database}\n配置：{path}\n访问地址：{origin}')
+    print('元数据采集配置已保存；请按原运行方式重启 Gateway，让插件加载配置。')
+    if args.start_service:
+        if sys.platform != 'linux':
+            raise ValueError('--start-service requires Linux user systemd')
+        unit = private_path(Path.home() / '.config/systemd/user/hermes-usage-manager.service')
+        text = service_text(auth, database, args.host, args.port, origin, args.allow_http)
+        unit.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if unit.exists():
+            if unit.read_text(encoding='utf-8') != text:
+                raise ValueError('Existing service settings differ; inspect the existing unit before changing it')
+        else:
+            descriptor = os.open(unit, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, 'w', encoding='utf-8', newline='\n') as output:
+                output.write(text)
+        subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True)
+        subprocess.run(['systemctl', '--user', 'enable', '--now', 'hermes-usage-manager.service'], check=True)
+        print('用量管理后台服务已启动。')
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Hermes Usage Manager independent web entry')
-    parser.add_argument('action', choices=['init', 'serve', 'service'])
-    parser.add_argument('--auth-file', default=str(Path.home() / '.hermes/usage-manager-data/standalone-auth.json'))
+    parser.add_argument('action', choices=['init', 'serve', 'service', 'setup'])
+    parser.add_argument('--auth-file')
+    parser.add_argument('--start-service', action='store_true', help='With setup, create and start the Linux user service')
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=9120)
     parser.add_argument('--public-url')
     parser.add_argument('--allow-http', action='store_true', help='Allow remote plain HTTP for isolated testing only')
     args = parser.parse_args(argv)
     try:
+        if args.start_service and args.action != 'setup':
+            raise ValueError('--start-service is only supported with setup')
+        args.auth_file = args.auth_file or settings().get('auth_file') or str(hermes_home() / 'usage-manager-data/standalone-auth.json')
         if args.action == 'init':
             password = getpass.getpass('设置用量管理管理员密码（至少12字符）: ')
             if password != getpass.getpass('再次输入密码: '):
@@ -244,13 +291,15 @@ def main(argv=None):
             initialize_auth(args.auth_file, password)
             print('Credentials initialized; no services or network ports were started.')
             return
-        database = os.environ.get('USAGE_MANAGER_DB_PATH', '')
-        if not Path(database).is_absolute():
-            raise ValueError('Set an explicit absolute USAGE_MANAGER_DB_PATH shared with the Hooks')
+        database = database_path()
         if not 1 <= args.port <= 65535:
             raise ValueError('Port must be between 1 and 65535')
         if args.host not in {'127.0.0.1', 'localhost', '::1'} and not args.public_url:
             raise ValueError('Remote binding requires an explicit --public-url')
+        if args.action == 'setup':
+            origin = canonical_origin(args.public_url or f'http://{args.host if args.host != "::1" else "[::1]"}:{args.port}')
+            setup_installation(args, database, origin)
+            return
         application = create_app(args.auth_file, database, args.public_url or f'http://{args.host if args.host != "::1" else "[::1]"}:{args.port}', args.allow_http)
         if args.action == 'service':
             if sys.platform != 'linux':
@@ -267,5 +316,7 @@ def main(argv=None):
         uvicorn.run(application, host=args.host, port=args.port, workers=1, proxy_headers=False, access_log=False)
     except FileExistsError:
         parser.exit(1, 'Existing credentials or service unit are not overwritten; preserve and inspect the existing file.\n')
-    except (ValueError, OSError, KeyError, ImportError, sqlite3.Error):
-        parser.exit(1, 'Standalone initialization/start failed. Check credentials, private paths, database, assets and origin settings.\n')
+    except subprocess.CalledProcessError:
+        parser.exit(1, '配置已保留，但 systemd 启动失败。请检查 systemctl --user status hermes-usage-manager.service；也可运行 standalone.py serve 前台启动。\n')
+    except (ValueError, OSError, KeyError, ImportError, sqlite3.Error) as error:
+        parser.exit(1, f'Standalone initialization/start failed ({type(error).__name__}). Check credentials, private paths, database, assets and origin settings.\n')

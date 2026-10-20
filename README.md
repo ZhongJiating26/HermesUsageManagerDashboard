@@ -5,10 +5,11 @@
 用户已确认新增独立端口仅显示用量管理平台，不显示Hermes外壳。原生Dashboard/Agent Hooks仍保留；独立入口共用业务API和SQLite，但有自己的React构建与管理员登录，不要求打开9119。
 
 ```bash
-hermes plugins install https://github.com/ZJTatTopsun/HermesUsageManagerDashboard.git
+hermes plugins install https://github.com/ZhongJiating26/HermesUsageManagerDashboard.git
+bash ~/.hermes/plugins/hermes-usage-manager/install.sh
 ```
 
-安装后需一次性初始化密码并启动独立服务，默认127.0.0.1:9120；不会静默开放公网或修改Gateway。完整命令、已有安装升级、测试IP访问及用户systemd常驻见[独立端口使用说明](docs/standalone.md)。0.6.0目标机验证尚待回传，以下M4验收是0.5.1历史基线，不代表新入口已实机验收。
+Linux用户systemd环境执行第二条安装引导后，只需输入两次管理员密码；脚本自动寻找Hermes的Python、创建私有数据目录、保存数据库与采集配置，并启动独立后台服务。默认访问http://127.0.0.1:9120；已有密码、数据和相同服务配置会保留。最后按原方式重启Gateway使配置生效，无需手动export变量；已有Gateway环境变量仍优先，旧DB配置需先调整。不会修改Gateway或开放公网。完整说明、非systemd环境及自定义配置见[独立端口使用说明](docs/standalone.md)。安装引导与0.6.0独立入口仍待目标机验证，以下M4验收是0.5.1历史基线。
 
 ## 原始开发规格与历史验收
 

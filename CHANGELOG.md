@@ -1,5 +1,11 @@
 # Changelog
 
+## 未发布 — 简化安装引导
+
+- 新增Linux `install.sh`，自动定位Hermes的Python并调用setup，首次输入两次密码即可创建私有数据目录、保存配置、生成并启动用户systemd服务。
+- Hooks和Web入口共用持久化数据库/采集配置，无需手动export；环境变量仍优先，未执行引导时采集默认关闭，不修改Gateway或网络配置。
+- setup可重复运行并保留密码与业务数据，已有不同服务配置拒绝覆盖；非systemd环境可setup后serve。已加入发行包库存，尚未在目标Hermes服务器实机验证。
+
 ## 0.6.0 — 独立端口用量管理平台
 
 - 按用户明确调整后的需求新增独立端口入口（默认127.0.0.1:9120），无需打开9119或显示Hermes外壳；继续保留原生Dashboard和五Hook，共用SQLite及同一业务API，无新schema迁移。
