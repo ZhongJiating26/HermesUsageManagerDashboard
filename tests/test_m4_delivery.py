@@ -64,6 +64,25 @@ def test_stage_and_cli_work_without_checkout_or_node(artifact, tmp_path):
         manage.stage(path, checksum, staged)
 
 
+def test_runtime_install_tree_matches_release_and_keeps_security_tests_out_of_runtime(artifact, tmp_path):
+    path, _ = artifact
+    destination = tmp_path / 'install'
+    with ZipFile(path) as archive:
+        prefix = manage.NAME + '/'
+        files = {name.removeprefix(prefix): archive.read(name) for name in archive.namelist()}
+    package_release.write_install_tree(files, destination)
+    assert manage.inventory(destination) == {name: package_release.checksum(data) for name, data in files.items()}
+    assert (destination / 'install.sh').is_file()
+    assert (destination / 'backend/standalone.py').read_bytes() == files['backend/standalone.py']
+    assert not (destination / 'tests').exists()
+    assert not (destination / 'frontend').exists()
+    assert not (destination / 'dev').exists()
+    before = manage.inventory(destination)
+    with pytest.raises(FileExistsError):
+        package_release.write_install_tree(files, destination)
+    assert manage.inventory(destination) == before
+
+
 @pytest.mark.parametrize('member', ['../escape', 'hermes-usage-manager/../../escape', '/absolute', 'hermes-usage-manager/a\\b', 'hermes-usage-manager/C:/secret', 'hermes-usage-manager/./a', 'hermes-usage-manager/CON', 'hermes-usage-manager/NUL.txt', 'hermes-usage-manager/ambiguous.'])
 def test_archive_rejects_unsafe_paths_before_creating_output(artifact, tmp_path, member):
     path, checksum = rewrite(artifact, tmp_path / 'unsafe.zip', lambda files: files.update({member: b'bad'}))

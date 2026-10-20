@@ -2,6 +2,7 @@
 
 ## 未发布 — 简化安装引导
 
+- 发布器新增--install-tree，将现有运行版库存原样导出到新目录，供独立安装分支/仓库分发；开发仓库继续保留脱敏/认证测试，服务机运行版不分发测试与Mock。新增库存一致和拒绝覆盖测试；未自动发布远端或改动Hermes扫描策略。
 - 将plugin.yaml的manifest_version声明降为1，兼容仅支持v1的Hermes安装器；插件未使用必须依赖v2的字段，api_version与五Hook保持不变。此前doctor/手动安装验收不能代替URL安装路径验证。
 - 新增Linux `install.sh`，自动定位Hermes的Python并调用setup，首次输入两次密码即可创建私有数据目录、保存配置、生成并启动用户systemd服务。
 - Hooks和Web入口共用持久化数据库/采集配置，无需手动export；环境变量仍优先，未执行引导时采集默认关闭，不修改Gateway或网络配置。

@@ -8,6 +8,8 @@
 
 ### 推荐：两条命令完成安装与初始化（Linux 用户 systemd）
 
+v0.21.0扫描源码仓库时已出现测试凭据样例误报并拒绝安装，该环境暂不直接执行下方源码URL命令。请先按[运行版分发说明](install-distribution.md)发布并扫描运行版，再使用真实运行版完整提交SHA执行`hermes plugins install --ref`；安装成功后第二条初始化命令不变。不能把本地候选已导出当成远端已发布或目标扫描器已通过。
+
 ```bash
 hermes plugins install https://github.com/ZhongJiating26/HermesUsageManagerDashboard.git
 bash ~/.hermes/plugins/hermes-usage-manager/install.sh

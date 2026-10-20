@@ -20,6 +20,25 @@ def checksum(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def write_install_tree(files, output):
+    """Export exactly the release inventory for a runtime-only Git distribution."""
+    path = Path(output).expanduser()
+    if not path.is_absolute() or any(parent.is_symlink() for parent in (path, *path.parents)):
+        raise ValueError('Install tree requires an absolute path without symlinks')
+    if not path.parent.is_dir():
+        raise ValueError('Install tree parent must exist')
+    path.mkdir(mode=0o700)  # Existing trees/checkouts are never overwritten.
+    for name, data in sorted(files.items()):
+        relative = Path(name)
+        if relative.is_absolute() or '..' in relative.parts:
+            raise ValueError('Unsafe release inventory path')
+        target = path / relative
+        target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with target.open('xb') as stream:
+            stream.write(data)
+    return path
+
+
 def collect(root):
     plugin = yaml.safe_load((root / 'plugin.yaml').read_text(encoding='utf-8'))
     dashboard = json.loads((root / 'dashboard/manifest.json').read_text(encoding='utf-8'))
@@ -91,6 +110,7 @@ def collect(root):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--require-tag', action='store_true', help='Require a clean worktree and v<version> tag at HEAD')
+    parser.add_argument('--install-tree', type=Path, help='Export the same runtime files to a new absolute directory for a separate install branch/repository')
     args = parser.parse_args(argv)
     version, files = collect(ROOT)
     source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
@@ -103,6 +123,9 @@ def main(argv=None):
     files['release.json'] = (json.dumps(release, sort_keys=True, ensure_ascii=False, indent=2) + '\n').encode()
     if len(files) > 2048 or len({name.casefold() for name in files}) != len(files) or sum(map(len, files.values())) > 64 * 1024 * 1024:
         raise ValueError('Release inventory exceeds staging limits')
+    if args.install_tree:
+        destination = write_install_tree(files, args.install_tree)
+        print(f'Runtime install tree (not published or scan-approved): {destination}')
     output = ROOT / f'build/{NAME}-{version}.zip'
     output.parent.mkdir(exist_ok=True)
     with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
