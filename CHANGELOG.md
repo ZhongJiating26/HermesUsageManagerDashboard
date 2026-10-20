@@ -2,6 +2,7 @@
 
 ## 未发布 — 简化安装引导
 
+- 按用户要求，install.sh默认监听0.0.0.0:9120，直接使用服务器公网/内网IP访问，无需手填public-url。IP模式逐请求校验Host和同源Origin，保留登录、CSRF及限速；域名/HTTPS继续使用显式public-url。旧自动生成的本机服务可备份后升级，setup重启服务使监听配置生效；不修改安全组和防火墙。
 - 修正systemd unit中带引号的WorkingDirectory导致bad-setting；运行路径均为绝对路径，不再设置该项。setup仅对完全匹配的旧生成文件备份后修复，自定义unit仍拒绝覆盖；启动后额外检查is-active，失败不再报告成功。安装脚本不再重复enable插件，避免额外提示内置工具覆盖授权。
 - 发布器新增--install-tree，将现有运行版库存原样导出到新目录，供独立安装分支/仓库分发；开发仓库继续保留脱敏/认证测试，服务机运行版不分发测试与Mock。新增库存一致和拒绝覆盖测试；未自动发布远端或改动Hermes扫描策略。
 - 将plugin.yaml的manifest_version声明降为1，兼容仅支持v1的Hermes安装器；插件未使用必须依赖v2的字段，api_version与五Hook保持不变。此前doctor/手动安装验收不能代替URL安装路径验证。

@@ -62,7 +62,7 @@ def test_setup_systemd_is_explicit_repeatable_and_reports_failure(installation, 
     unit = standalone.Path.home() / '.config/systemd/user/hermes-usage-manager.service'
     before = unit.read_bytes()
     assert 'HERMES_HOME=' in before.decode()
-    assert calls == [['systemctl', '--user', 'daemon-reload'], ['systemctl', '--user', 'enable', '--now', 'hermes-usage-manager.service'], ['systemctl', '--user', 'is-active', '--quiet', 'hermes-usage-manager.service']]
+    assert calls == [['systemctl', '--user', 'daemon-reload'], ['systemctl', '--user', 'enable', 'hermes-usage-manager.service'], ['systemctl', '--user', 'restart', 'hermes-usage-manager.service'], ['systemctl', '--user', 'is-active', '--quiet', 'hermes-usage-manager.service']]
     standalone.main(['setup', '--start-service'])
     assert unit.read_bytes() == before
     unit.write_text('custom service', encoding='utf-8')
@@ -134,3 +134,21 @@ def test_exact_legacy_unit_is_backed_up_and_repaired_without_resetting_password(
     assert len(backups) == 1
     assert backups[0].read_text(encoding='utf-8') == legacy
     assert auth.read_bytes() == credentials
+
+
+def test_direct_ip_setup_upgrades_own_loopback_unit_and_keeps_database_and_password(installation, monkeypatch):
+    monkeypatch.setattr(standalone.sys, 'platform', 'linux')
+    monkeypatch.setattr(standalone.subprocess, 'run', lambda *args, **kwargs: None)
+    standalone.main(['setup', '--start-service'])
+    database = config.database_path()
+    auth = installation / 'usage-manager-data/standalone-auth.json'
+    password_record = auth.read_bytes()
+    standalone.main(['setup', '--start-service', '--host', '0.0.0.0', '--allow-http'])
+    unit = standalone.Path.home() / '.config/systemd/user/hermes-usage-manager.service'
+    text = unit.read_text()
+    assert '"--host" "0.0.0.0"' in text
+    assert '"--allow-http"' in text
+    assert '--public-url' not in text
+    assert auth.read_bytes() == password_record
+    assert config.database_path() == database
+    assert list(unit.parent.glob('hermes-usage-manager.service.before-fix-*'))

@@ -260,3 +260,30 @@ def test_standalone_refuses_core_database_before_writing(setup, tmp_path):
     with pytest.raises(ValueError, match='core state.db'):
         create_app(auth, core, 'http://localhost:9120')
     assert not core.exists()
+
+
+@pytest.mark.parametrize('origin', ['http://192.0.2.10:9120', 'http://10.0.0.10:9120', 'http://[2001:db8::10]:9120'])
+def test_direct_ip_access_authenticates_on_each_ip_with_strict_origin(setup, origin):
+    _, _, auth, database = setup
+    application = create_app(auth, database, None, allow_http=True)
+    with TestClient(application, base_url=origin) as client:
+        assert client.get('/').status_code == 200
+        assert client.get(PREFIX + '/health').status_code == 401
+        csrf = login(client, origin)
+        assert client.get(PREFIX + '/health').status_code == 200
+        for bad in ('http://evil.invalid', 'http://192.0.2.11:9120', 'null', 'https://10.0.0.10:9120'):
+            assert client.post('/api/auth/logout', headers={'Origin': bad, 'x-hum-csrf': csrf}).status_code == 403
+        assert client.post('/api/auth/logout', headers={'Origin': origin, 'x-hum-csrf': 'wrong'}).status_code == 403
+        assert client.post('/api/auth/logout', headers={'Origin': origin, 'x-hum-csrf': csrf}).status_code == 200
+
+
+def test_direct_ip_rejects_dns_rebinding_and_forwarded_origin(setup):
+    _, _, auth, database = setup
+    with TestClient(create_app(auth, database, None, True), base_url='http://192.0.2.10:9120') as client:
+        for host in ('evil.invalid', 'user@192.0.2.10', '192.0.2.10/path', '[broken'):
+            assert client.get('/', headers={'Host': host}).status_code == 400
+        assert client.post('/api/auth/login', json={'password': PASSWORD}, headers={
+            'Origin': 'http://evil.invalid', 'X-Forwarded-Host': 'evil.invalid', 'X-Forwarded-Proto': 'https',
+        }).status_code == 403
+    with pytest.raises(ValueError, match='allow-http'):
+        create_app(auth, database, None)

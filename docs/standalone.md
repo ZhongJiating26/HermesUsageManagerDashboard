@@ -15,7 +15,11 @@ hermes plugins install https://github.com/ZhongJiating26/HermesUsageManagerDashb
 bash ~/.hermes/plugins/hermes-usage-manager/install.sh
 ```
 
-安装引导自动检测Hermes命令的Python解释器（无法识别时检查Hermes目录内的venv），首次只需交互输入两次管理员密码。自动创建私有目录及数据库、保存元数据采集配置、生成并启用用户systemd服务，默认仅监听127.0.0.1:9120。脚本须来自包含install.sh的新代码；未同步的旧仓库版本不具备此功能。不会修改Gateway或防火墙。
+安装引导自动检测Hermes命令的Python解释器（无法识别时检查Hermes目录内的venv），首次只需交互输入两次管理员密码。按用户2026-10-20要求，脚本默认使用`--host 0.0.0.0 --allow-http`，自动创建私有目录及数据库、保存采集配置、生成并启动用户systemd服务；之后浏览器直接访问`http://服务器IP:9120`。公网和内网IP均可，无需配置public-url；客户端来源IP不由插件限制，但仍需登录。HTTP不加密，长期使用可配置HTTPS入口。云安全组/防火墙需允许9120；脚本不修改Gateway、安全组或防火墙。
+
+直接IP模式只接受IP地址或localhost作为Host，不能使用任意域名；每次登录、写操作仍严格比较Origin与当前访问的协议、IP及端口，保留CSRF校验，不设置通配CORS，不信任X-Forwarded-*。域名/HTTPS入口继续用固定--public-url配置。现有自动生成的127.0.0.1服务会先备份再更新并重启；已有密码和数据保留，自定义unit或drop-in需由管理员检查。
+
+只需本机访问时可运行`bash ~/.hermes/plugins/hermes-usage-manager/install.sh --host 127.0.0.1`。下方手动分步serve/service命令默认仍为本机监听；安装引导脚本才默认采用所有网卡。
 
 最后按原启动方式重启Gateway以加载新版插件。无需在终端或Gateway服务手动设置数据库、实例ID、采集变量；实例ID继续使用现有自动生成规则。显式环境变量仍优先，已有Gateway若配置过旧数据库路径或关闭采集，应先调整对应旧配置。多Profile需分别运行对应Home的引导，或显式配置共享DB，不能自动跨Profile汇聚。
 
