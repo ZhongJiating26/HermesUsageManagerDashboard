@@ -55,7 +55,6 @@
     "docs/security-review.md": "095a9427b386742ce4cbdd41838aec69b71cddc63572d1c9d4a4596319409cf2",
     "docs/standalone-report.md": "99baa39326c5c8fb983f0b3e6bac5cde7e98bf57f214cb61a6761f4dd107a72c",
     "docs/standalone.md": "e2a89363eed7e03a48d8c6f97a7d362442b41705577b1bf6998de13658fb16cd",
-    "docs/ui-design-system.md": "f97ac1629c507fbd95534660bf8c2645c270eb0bdf96f3e3dda826663f7b90f1",
     "install.sh": "4b02b734909e81ef5706cc73576f7dcf67254f8c84992767dfc18e575d209a9c",
     "ops/__init__.py": "92c730bb1cfe93d4bebd27e549d4474add59269743aa91800f0a74ad4b929ee3",
     "ops/manage.py": "f350e8bd901b28fa072faa3bdff42bc55f8122469de4c1bd65e8f3f0162e8b37",
