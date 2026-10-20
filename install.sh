@@ -31,4 +31,4 @@ if [ -z "${HERMES_COMMAND:-}" ]; then
 fi
 USAGE_MANAGER_COLLECTION=0 "$HERMES_COMMAND" plugins doctor --ci "$PLUGIN_DIR"
 "$PYTHON" "$PLUGIN_DIR/standalone.py" setup --start-service "$@"
-"$HERMES_COMMAND" plugins enable hermes-usage-manager
+echo '安装配置完成。请按原方式重启 Gateway，使采集配置生效。'
