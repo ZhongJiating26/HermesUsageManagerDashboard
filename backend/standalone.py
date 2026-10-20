@@ -135,7 +135,7 @@ def create_app(auth_file, database, public_url, allow_http=False, assets=None):
     salt, expected = read_auth(auth_file)
     if Path(database).resolve().name.casefold() == 'state.db':
         raise ValueError('Do not use the Hermes core state.db as a usage database')
-    runtime = api.Runtime(Store(database), content_provider=api.HermesSessionContentProvider())
+    runtime = api.Runtime(Store(database), content_provider=api.HermesSessionContentProvider(local_admin=True))
     directory = Path(assets) if assets else ROOT / 'standalone/dist'
     for name in ('index.html', 'app.js', 'app.css'):
         if not (directory / name).is_file():
