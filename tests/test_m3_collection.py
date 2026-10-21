@@ -49,13 +49,50 @@ def test_unknown_usage_schema_does_not_fabricate_zeros(scope, usage):
     assert event.output_tokens is None and event.pricing_supported is False
 
 
-def test_canonical_defaults_and_cache_write_do_not_make_false_prices(scope):
+def test_canonical_zero_cache_and_unsupported_cache_write(scope):
     values = payload()['usage'] | {'input_tokens': 100, 'cache_read_tokens': 0, 'prompt_tokens': 100}
     event = hooks.Normalizer().normalize('post_api_request', payload(usage=values), scope)
-    assert event.input_total_tokens == 100 and event.cached_input_tokens is None
+    assert event.input_total_tokens == 100 and event.cached_input_tokens == 0
     values = payload()['usage'] | {'cache_write_tokens': 10, 'prompt_tokens': 110}
     event = hooks.Normalizer().normalize('post_api_request', payload(usage=values), scope)
     assert event.input_total_tokens == 110 and event.cache_write_tokens == 10
+    assert event.pricing_supported is False
+
+
+@pytest.mark.parametrize('input_tokens,output_tokens', [(100, 20), (100, 0), (0, 20), (0, 0)])
+def test_explicit_zero_usage_reaches_storage_prices_and_quality(scope, input_tokens, output_tokens):
+    from tests.test_m2_sqlite import admin, price, schemas
+    store = db.Store(scope.db_path)
+    values = {'input_tokens': input_tokens, 'cache_read_tokens': 0,
+              'cache_write_tokens': 0, 'prompt_tokens': input_tokens,
+              'output_tokens': output_tokens}
+    event = hooks.Normalizer().normalize('post_api_request', payload(provider='Test', usage=values), scope)
+    with store.transaction() as connection:
+        admin.save_price(connection, ADMIN, price(valid_to='2026-10-31'))
+        assert events.ingest_model(connection, event)
+        assert not events.ingest_model(connection, event)
+    window = schemas.Window('2026-10-01', '2026-11-01', 'Asia/Shanghai')
+    with store.read() as connection:
+        row = connection.execute('SELECT * FROM llm_requests').fetchone()
+        assert row['cached_input_tokens'] == 0
+        assert row['input_total_tokens'] == row['uncached_input_tokens'] == input_tokens
+        assert row['output_tokens'] == output_tokens
+        assert row['total_tokens'] == input_tokens + output_tokens
+        assert row['cost_micro_usd'] == input_tokens * 2 + output_tokens * 4
+        assert row['cost_source'] == 'estimated'
+        result = quality.details(connection, window, ADMIN)['window']
+        assert result['requests'] == 1
+        assert result['missing_usage'] == result['missing_cache'] == result['unknown_cost'] == 0
+
+
+@pytest.mark.parametrize('usage', [
+    {'input_tokens': 0, 'cache_read_tokens': None, 'cache_write_tokens': 0, 'prompt_tokens': 0, 'output_tokens': 0},
+    {'input_tokens': 0, 'cache_read_tokens': 0, 'cache_write_tokens': 0, 'output_tokens': 0},
+    {'input_tokens': 0, 'cache_read_tokens': False, 'cache_write_tokens': 0, 'prompt_tokens': 0, 'output_tokens': 0},
+])
+def test_missing_or_invalid_zero_fields_remain_unknown(scope, usage):
+    event = hooks.Normalizer().normalize('post_api_request', payload(usage=usage), scope)
+    assert event.input_total_tokens is event.cached_input_tokens is event.output_tokens is None
     assert event.pricing_supported is False
 
 
