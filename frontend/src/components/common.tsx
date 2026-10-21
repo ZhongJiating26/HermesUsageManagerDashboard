@@ -4,6 +4,8 @@ import { Select } from './Select';
 
 export const number = (value: number | null | undefined) => value == null ? '—' : new Intl.NumberFormat('zh-CN').format(value);
 export const compact = (value: number | null) => value == null ? '—' : new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+export const million = (value: number | null | undefined, precision = 6) => value == null ? '—' : new Intl.NumberFormat('en-US', { maximumFractionDigits: value > 0 && value / 1_000_000 < 10 ** -precision ? 6 : precision }).format(value / 1_000_000);
+export const tokens = (value: number | null | undefined) => value == null ? '—' : `${million(value)} M Token`;
 export const money = (value: number | null) => value == null ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(value);
 export const time = (value: string) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(value));
 

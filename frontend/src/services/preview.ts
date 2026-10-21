@@ -26,7 +26,7 @@ export type ModelRequest = z.infer<typeof requestSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type Price = z.infer<typeof priceSchema>;
 export type Distribution = z.infer<typeof distributionSchema>;
-export type Selection = { start: string; end: string; department_id: string; user_id: string; server_id: string };
+export type Selection = { start: string; end: string; department_id: string; user_id: string; server_id: string; all_time?: boolean };
 export const metaSchema = z.object({ data_source: z.enum(['mock', 'live']), tz: z.string(), total: z.number().optional(), page: z.number().optional(), page_size: z.number().optional() });
 let expectedSource: 'mock' | 'live' = 'live';
 export function configureSource(source: 'mock' | 'live') { expectedSource = source; }
@@ -39,8 +39,8 @@ export async function preview<T>(path: string, schema: z.ZodType<T>, init?: Requ
 }
 
 export function query(selection: Selection, extra: Record<string, string | number> = {}) {
-  const { start, end, ...filters } = selection;
-  return new URLSearchParams({ from: start, to: end, tz: 'Asia/Shanghai', ...filters, ...Object.fromEntries(Object.entries(extra).map(([key, value]) => [key, String(value)])) }).toString();
+  const { start, end, all_time, ...filters } = selection;
+  return new URLSearchParams({ from: start, to: end, tz: 'Asia/Shanghai', ...filters, ...(all_time ? { all_time: 'true' } : {}), ...Object.fromEntries(Object.entries(extra).map(([key, value]) => [key, String(value)])) }).toString();
 }
 
 export function useResource<T>(path: string, schema: z.ZodType<T>, revision = 0) {

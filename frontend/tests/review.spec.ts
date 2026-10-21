@@ -44,7 +44,7 @@ test('filter pills have no prefixed text and all pie values appear only on hover
     const chart = page.locator('.hum-card').filter({ has: page.getByRole('heading', { name, exact: true }) }).locator('.hum-chart');
     await expect(chart).not.toContainText(/Tokens|%/);
     await chart.locator('svg path[fill="#6750a4"]').first().hover();
-    await expect(chart).toContainText('Tokens');
+    await expect(chart).toContainText('M Token');
     await expect(chart).toContainText('%');
     await page.mouse.move(1, 1);
   }

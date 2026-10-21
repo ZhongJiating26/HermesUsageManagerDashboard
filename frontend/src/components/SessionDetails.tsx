@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { React } from '../platform/react-host';
 import { query, timelineSchema, type Filters, type Selection, type Session } from '../services/preview';
 import { useConversation } from '../services/conversation';
-import { compact, Empty, ResourceState, time } from './common';
+import { tokens, Empty, ResourceState, time } from './common';
 import { InfoTip } from './InfoTip';
 
 type Message = z.infer<typeof timelineSchema>['messages'][number];
@@ -51,9 +51,9 @@ export function SessionDetails({ session, filters, selection }: { session: Sessi
         <div><dt>用户</dt><dd>{filters.users.find((item) => item.id === session.user_id)?.name ?? '未归属'}</dd></div>
         <div><dt>已加载消息</dt><dd>{data ? `${resource.loaded} 条` : '—'}</dd></div>
         <div><dt>MCP 调用</dt><dd>{session.mcp_calls} 次</dd></div>
-        <div><dt>输入未命中</dt><dd>{compact(session.input)}</dd></div>
-        <div><dt>输出</dt><dd>{compact(session.output)}</dd></div>
-        <div><dt>缓存读取</dt><dd>{compact(session.cached)}</dd></div>
+        <div><dt>输入未命中</dt><dd>{tokens(session.input)}</dd></div>
+        <div><dt>输出</dt><dd>{tokens(session.output)}</dd></div>
+        <div><dt>缓存读取</dt><dd>{tokens(session.cached)}</dd></div>
       </dl>
     </header>
     <div ref={scroll} className="hum-conversation" role="region" aria-label="对话记录" tabIndex={0} aria-busy={resource.loading}>

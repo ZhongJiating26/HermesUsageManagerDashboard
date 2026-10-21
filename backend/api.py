@@ -72,7 +72,7 @@ def envelope(runtime, data, window=None, **extra):
     with runtime.store.read() as connection:
         meta = {"data_source": runtime.store.source, "tz": window.tz if window else "Asia/Shanghai", "coverage": queries.coverage(connection), **extra}
     if window:
-        meta.update({"from": window.start, "to": window.end})
+        meta.update({"from": None if window.all_time else window.start, "to": None if window.all_time else window.end, "all_time": window.all_time})
     return {"data": data, "meta": meta}
 
 
@@ -96,6 +96,17 @@ def data_quality(window=Depends(get_window), runtime=Depends(get_runtime), princ
     with runtime.store.read() as connection:
         result = quality.details(connection, window, principal)
     return envelope(runtime, result, window)
+
+
+@router.get('/history/users', response_model=Envelope)
+def historical_users(department_id: str = Query('', max_length=256), user_id: str = Query('', max_length=256), runtime=Depends(get_runtime), principal=Depends(get_principal)):
+    require(principal, 'audit_detail')
+    if runtime.store.source != 'live':
+        return envelope(runtime, {'available': False, 'source': 'hermes_session_model_usage', 'scope': 'current_hermes_home', 'users': [], 'message': '模拟环境未连接 Hermes 历史汇总'})
+    from .adapters.history import user_history
+    with runtime.store.read() as connection:
+        result = user_history(connection, department_id, user_id)
+    return envelope(runtime, result)
 
 
 @router.get("/filters", response_model=Envelope)

@@ -15,7 +15,7 @@ class Envelope(BaseModel):
 
 
 class Window:
-    def __init__(self, start, end, tz, department_id="", user_id="", server_id=""):
+    def __init__(self, start, end, tz, department_id="", user_id="", server_id="", all_time=False):
         try:
             self.zone = ZoneInfo(tz)
             self.start = datetime.fromisoformat(start)
@@ -24,21 +24,22 @@ class Window:
                 self.start = self.start.replace(tzinfo=self.zone)
             if self.end.tzinfo is None:
                 self.end = self.end.replace(tzinfo=self.zone)
-            if (self.end.astimezone(self.zone).date() - self.start.astimezone(self.zone).date()).days > 366:
+            if not all_time and (self.end.astimezone(self.zone).date() - self.start.astimezone(self.zone).date()).days > 366:
                 raise ValueError('Too many calendar days')
             self.start, self.end = utc(self.start), utc(self.end)
             delta = datetime.fromisoformat(self.end) - datetime.fromisoformat(self.start)
-            if not timedelta(0) < delta <= timedelta(days=367):
+            if delta <= timedelta(0) or (not all_time and delta > timedelta(days=367)):
                 raise ValueError("Invalid range")
         except (ValueError, ZoneInfoNotFoundError) as error:
             raise HTTPException(422, {"code": "INVALID_WINDOW", "message": "日期范围或时区无效（最多 366 个自然日）"}) from error
         self.tz = tz
         self.department_id, self.user_id, self.server_id = department_id, user_id, server_id
+        self.all_time = all_time
 
 
-def get_window(from_: str | None = Query(None, alias="from"), to: str | None = None, tz: str = "Asia/Shanghai", start: str | None = None, end: str | None = None, department_id: str = "", user_id: str = "", server_id: str = ""):
+def get_window(from_: str | None = Query(None, alias="from"), to: str | None = None, tz: str = "Asia/Shanghai", start: str | None = None, end: str | None = None, department_id: str = "", user_id: str = "", server_id: str = "", all_time: bool = False):
     today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
-    return Window(from_ or start or str(today - timedelta(days=6)), to or end or str(today + timedelta(days=1)), tz, department_id, user_id, server_id)
+    return Window(from_ or start or str(today - timedelta(days=6)), to or end or str(today + timedelta(days=1)), tz, department_id, user_id, server_id, all_time)
 
 
 class DepartmentBody(BaseModel):
