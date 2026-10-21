@@ -40,6 +40,36 @@ def message_time(value):
     return None
 
 
+def tool_invocations(message):
+    calls = message.get('tool_calls')
+    if isinstance(calls, str):
+        try:
+            calls = json.loads(calls)
+        except (ValueError, RecursionError):
+            return []
+    if not isinstance(calls, list):
+        return []
+    return [call for call in calls[:200] if isinstance(call, dict)]
+
+
+def tool_arguments(value):
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (ValueError, RecursionError):
+            return redact(value)
+    def clean(item):
+        if isinstance(item, dict):
+            return {key: '[已脱敏]' if re.search(r'(?i)(password|passwd|api.?key|secret|token|authorization|cookie|private.?key|credential)', str(key)) else clean(val) for key, val in item.items()}
+        if isinstance(item, list):
+            return [clean(val) for val in item]
+        return item
+    try:
+        return redact(json.dumps(clean(value), ensure_ascii=False, indent=2))
+    except (TypeError, ValueError, RecursionError):
+        return '[工具参数格式无法解析]'
+
+
 class HermesSessionContentProvider:
     def __init__(self, factory=None, homes=None, *, local_admin=False):
         self.factory, self.homes = factory, homes
@@ -94,7 +124,10 @@ class HermesSessionContentProvider:
                 parameters = signature.parameters
                 if not {'limit', 'offset', 'latest'}.issubset(parameters):
                     raise unavailable()
-                options = {'limit': limit + 1, 'offset': offset, 'latest': False}
+                # Bounded lookbehind also matches calls when a page starts with
+                # a tool result whose assistant invocation was on the prior page.
+                lookbehind = min(offset, 200)
+                options = {'limit': lookbehind + limit + 1, 'offset': offset - lookbehind, 'latest': False}
                 if 'include_ancestors' in parameters:
                     options['include_ancestors'] = False
                 signature.bind(session_id, **options)
@@ -112,18 +145,32 @@ class HermesSessionContentProvider:
         tool_setting = os.environ.get('USAGE_MANAGER_TOOL_CONTENT')
         tool_content = tool_setting == '1' if tool_setting is not None else self.local_admin
         projected = []
-        for index, message in enumerate(messages[:limit]):
+        calls = {}
+        for index, message in enumerate(messages[:lookbehind + limit]):
             role = message.get('role')
+            if role == 'assistant':
+                for call in tool_invocations(message):
+                    call_id = call.get('id') or call.get('call_id')
+                    if isinstance(call_id, str) and call_id:
+                        calls[call_id] = call.get('function') if isinstance(call.get('function'), dict) else call
+            if index < lookbehind:
+                continue
             if role not in ('user', 'assistant', 'tool'):
                 continue
-            identifier = str(message.get('id') if message.get('id') is not None else offset + index)
+            identifier = str(message.get('id') if message.get('id') is not None else offset + index - lookbehind)
             timestamp = message_time(message.get('timestamp'))
             if role == 'tool':
-                tool = {'id': identifier, 'name': redact(message.get('name') or '工具'), 'time': timestamp, 'success': not message['is_error'] if type(message.get('is_error')) is bool else None, 'args': '[工具参数未读取]', 'result': redact(message.get('content')) if tool_content else '[工具结果已隐藏]'}
+                call_id = message.get('tool_call_id')
+                call = calls.get(call_id, {}) if isinstance(call_id, str) else {}
+                args = '[工具参数已隐藏]'
+                if tool_content:
+                    args = tool_arguments(call['arguments']) if 'arguments' in call else '[当前读取范围未找到对应调用参数]'
+                tool = {'id': identifier, 'name': redact(message.get('tool_name') or message.get('name') or call.get('name') or '未知工具'), 'time': timestamp, 'success': not message['is_error'] if type(message.get('is_error')) is bool else None, 'args': args, 'result': redact(message.get('content')) if tool_content else '[工具结果已隐藏]'}
                 if projected and projected[-1]['kind'] == 'tools':
                     projected[-1]['tools'].append(tool)
                 else:
                     projected.append({'id': identifier, 'kind': 'tools', 'text': '', 'tools': [tool]})
             else:
                 projected.append({'id': identifier, 'kind': role, 'text': redact(message.get('content')), 'time': timestamp, 'tools': []})
-        return {'title': redact(owner['title'])[:200] if isinstance(owner.get('title'), str) else None, 'messages': projected, 'pagination': {'offset': offset, 'limit': limit, 'has_more': len(messages) > limit, 'returned': min(len(messages), limit)}}
+        page_count = max(0, len(messages) - lookbehind)
+        return {'title': redact(owner['title'])[:200] if isinstance(owner.get('title'), str) else None, 'messages': projected, 'pagination': {'offset': offset, 'limit': limit, 'has_more': page_count > limit, 'returned': min(page_count, limit)}}

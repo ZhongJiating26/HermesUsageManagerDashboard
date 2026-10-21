@@ -127,7 +127,7 @@ service命令只新建~/.config/systemd/user/hermes-usage-manager.service，不�
 - 会话8小时到期、进程重启全部失效，Cookie为HttpOnly/SameSite=Strict，HTTPS使用Secure；退出服务端撤销会话。登录每IP每分钟最多5次尝试，内存会话/限速表有上限，不依赖localStorage存令牌。
 - CLI固定单worker；会话与限速在进程内，不支持将多个独立服务实例置于负载均衡后冒充共享登录集群。
 - 业务API（包括health）均需登录；写入还需固定Origin和CSRF。Origin错误时检查public-url和实际访问URL，而不是关闭校验。
-- 管理员登录后默认可读当前Hermes Home的正文和工具结果；仍只读、分页、脱敏并记录审计，不读取工具参数。显式关闭变量或配置Profile映射仍优先，其他Home不自动开放；未知身份/缓存/费用不补零。
+- 管理员登录后默认可读当前Hermes Home的正文、工具参数和结果；按调用ID关联参数，仍只读、分页、脱敏并记录审计。显式关闭变量或配置Profile映射仍优先，其他Home不自动开放；未知身份/缓存/费用不补零。
 - 空库初次没有图表数据是正常状态；有采集后才显示真实记录。采集degraded需结合心跳与队列，不把进程退出当成零用量。
 
 ## 6. 本次验证边界
