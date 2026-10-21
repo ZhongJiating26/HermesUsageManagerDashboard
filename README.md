@@ -4,7 +4,7 @@
 
 ## 安装
 
-先安装并配置 Hermes。以下步骤适用于 Linux 用户 systemd 环境，仓库默认分支须设为 `main`：
+先安装并配置 Hermes。以下步骤适用于 Linux 用户 systemd 环境，仓库默认分支须设为 `master`：
 
 ```bash
 hermes plugins install --enable https://gitee.com/ZhongJiating26/HermesUsageManagerDashboard.git
@@ -51,8 +51,8 @@ journalctl --user -u hermes-usage-manager.service -n 50 --no-pager
 
 ## 分支
 
-- `main`：正式运行版，包含预构建前端，不包含测试、Mock 或开发工具，不需要 Node.js。
-- `master`：开发源码、测试和构建工具。
+- `master`：正式运行版，包含预构建前端，不包含测试、Mock 或开发工具，不需要 Node.js。
+- `codex/development`：开发源码、测试和构建工具。
 
 安装不需要填写提交 SHA；如需固定版本或回退，可选用 `--ref` 指定已经发布的完整提交 SHA。
 

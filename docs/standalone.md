@@ -8,7 +8,7 @@
 
 ### 推荐：两条命令完成安装与初始化（Linux 用户 systemd）
 
-正式安装分支为 `main`，包含运行文件和预构建前端，不包含测试与开发工具。远端默认分支设为 `main` 后，直接安装仓库地址即可，无需指定 SHA；见[分发说明](install-distribution.md)。
+正式安装分支为 `master`，包含运行文件和预构建前端，不包含测试与开发工具。远端默认分支设为 `master` 后，直接安装仓库地址即可，无需指定 SHA；见[分发说明](install-distribution.md)。
 
 ```bash
 hermes plugins install --enable https://gitee.com/ZhongJiating26/HermesUsageManagerDashboard.git

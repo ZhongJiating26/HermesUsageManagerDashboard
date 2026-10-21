@@ -1,7 +1,7 @@
 {
   "files": {
-    "CHANGELOG.md": "65f6e2b7d17405926b42a3df8eeac55d5ce4ea8a3efb1a68e1d37f0f1cc0f8e8",
-    "README.md": "74a22ec77a1b718917ad8434c8889945f73f0a516a123e4ec4eb95b631ad66a3",
+    "CHANGELOG.md": "07ea6f757b68802ed8a54df0967858b31d913679f43ca0c892eb14b3d2ce5a83",
+    "README.md": "7df6ae379dbddfc17f45fce9a080a2ad95771e3e545d141998a55d8b7955245e",
     "__init__.py": "b5673fe796091f6d578484ad6d6725332a44d57f9307d45ddcae212715627029",
     "backend/__init__.py": "ed1fafd50ce033cf0aa3abe4488c7e8063fdd18e5b47a845e22ff08dc8f5e8c7",
     "backend/adapters/__init__.py": "d8370d1d4d8b5f72c26ef0fd57681beb38a88092029b22e6d344f0244ff8cc55",
@@ -39,7 +39,7 @@
     "docs/configuration.md": "a584ccd42fd6ae9d7fe54a9e8a771f8e33da4e332c60c0298949b972f1c1725a",
     "docs/deployment.md": "64cedb2fe8bc416eea6129a1767f77a30c3625ff7d2162f9ab6768f264bf4f9c",
     "docs/development.md": "4b086d21ca6fb5113a3bfea9bca4ad4b3dc39b8b3064682925b44336c245cd67",
-    "docs/install-distribution.md": "8b6f797bf6d6c21e32287531994060ea0ac5bf15577f064b3a63b525c1d3678c",
+    "docs/install-distribution.md": "dc06da12196bfb1b6ddf0ec3ff91d1f28ae7147285bdabf8a3a22e59dd6f9e96",
     "docs/m0-report.md": "e2ab899d45aec29595cfd5c92ff1c510614327007a1a9a9ca9bdb80183912585",
     "docs/m1-design.md": "3cfee0a91802b83dbbf4a46346dcb1144660f2e5fc15d7e3130305dc665302eb",
     "docs/m1-report.md": "a552ea21be55fe3acaadbbc7e2cc7506611cf4647b5200739672243134c677c4",
@@ -56,7 +56,7 @@
     "docs/m4-report.md": "e6a6ae626f8427b22a39abd6a65fa1d17c643779eb2e12145bf9dee888dc9d1f",
     "docs/security-review.md": "13973c14d1179ea3e51f0c998db67e0378e9af7ab82c3bdca92381871ab07249",
     "docs/standalone-report.md": "99baa39326c5c8fb983f0b3e6bac5cde7e98bf57f214cb61a6761f4dd107a72c",
-    "docs/standalone.md": "8bd86550bf43ea4b50cde4fbe584bf6f4c7ef4b2fa316b0ceaf37047ce44f869",
+    "docs/standalone.md": "b102a62aad7f33aec7598c1e9a22d521ac7b502be7d4798424b3d5779fefdd6b",
     "install.sh": "d825def811f1144a9014941449b93a180a8b5c3cca11c190c8cb14e653af783a",
     "ops/__init__.py": "92c730bb1cfe93d4bebd27e549d4474add59269743aa91800f0a74ad4b929ee3",
     "ops/manage.py": "f350e8bd901b28fa072faa3bdff42bc55f8122469de4c1bd65e8f3f0162e8b37",
