@@ -37,13 +37,15 @@ hermes dashboard --host 127.0.0.1 --port 9119 --no-open
 | USAGE_MANAGER_SESSION_CONTENT | 独立入口管理员默认可读当前Hermes Home的对话；原生Dashboard仍默认关闭。显式0可关闭，1启用有界只读正文 |
 | USAGE_MANAGER_SESSION_HOMES | JSON映射instance/Profile到允许的绝对Hermes home；只读取其中现有state.db，不接受HTTP传入路径 |
 | USAGE_MANAGER_SESSION_PROFILES | 可选JSON映射instance/Profile到真实宿主profile_name，例如home哈希ID映射default；未设置仍严格比较原ID，不默认放宽 |
-| USAGE_MANAGER_TOOL_CONTENT | 独立入口管理员默认可读工具结果，原生Dashboard仍默认关闭；显式0可隐藏。工具参数始终不读取 |
+| USAGE_MANAGER_TOOL_CONTENT | 独立入口管理员默认可读脱敏后的工具参数与结果，原生Dashboard仍默认关闭；显式0同时隐藏参数和结果 |
 
 HUM_MOCK_DB_PATH/HUM_MOCK_TESTING仅用于开发Mock，不是服务机身份/数据源开关。时区与导出等业务配置保存在插件SQLite，默认Asia/Shanghai；费用是版本化价格估算，不是账单。
 
 正文配置示例和验证后关闭方法见m3-042-testing.md。授权范围是Profile级而不是一条会话。通过审计页的管理员校验才读取正文，成功/拒绝/不可用写入访问审计；正文不复制到插件库，脱敏只是启发式，不能保证识别所有秘密。浏览器已经显示的数据不会因服务端关开关自动抹除，须关闭详情并刷新。
 
 2026-10-20按用户要求调整独立入口：登录成功即当前实例管理员，不再要求手工打开正文开关或为本机默认Home填写映射。默认只读当前Hermes Home的state.db；自动识别本机Profile/旧版home哈希ID，并将默认Home映射到Hermes会话的default归属。其他Home或机器的数据仍须显式配置映射；不会根据客户端参数打开任意路径。旧实例标签但相同Home哈希的历史记录仍可读取。原生Dashboard的身份桥接和显式正文开关保持原有行为。
+
+2026-10-21按用户要求补齐工具审计：优先使用Hermes保存的tool_name，通过tool_call_id关联先前assistant消息中的function.arguments，脱敏后格式化显示。分页最多回看200条同会话消息以关联跨页调用；匹配不到时明确提示，不猜测参数。工具参数与正文均不复制到插件数据库。
 
 ## 网络与身份
 

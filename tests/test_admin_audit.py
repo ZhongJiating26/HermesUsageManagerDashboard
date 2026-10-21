@@ -1,3 +1,4 @@
+import json
 import secrets
 import sys
 from pathlib import Path
@@ -36,8 +37,8 @@ def local_sessions(tmp_path, monkeypatch):
             assert limit == 101 and offset == 0 and latest is False
             return [
                 {'id': 1, 'session_id': session_id, 'role': 'user', 'content': 'Hello'},
-                {'id': 2, 'session_id': session_id, 'role': 'assistant', 'content': 'Welcome'},
-                {'id': 3, 'session_id': session_id, 'role': 'tool', 'content': 'Result password=secret-value'},
+                {'id': 2, 'session_id': session_id, 'role': 'assistant', 'content': 'Welcome', 'tool_calls': [{'id': 'call-1', 'function': {'name': 'tool_call', 'arguments': json.dumps({'query': 'example', 'api_key': 'argument-secret', 'headers': {'Authorization': 'Bearer header-secret'}})}}]},
+                {'id': 3, 'session_id': session_id, 'role': 'tool', 'tool_call_id': 'call-1', 'tool_name': 'mcp__catalog__search', 'content': 'Result password=secret-value'},
             ]
 
         def close(self):
@@ -68,6 +69,10 @@ def test_logged_in_standalone_admin_can_read_local_conversation_without_manual_f
         result = response.json()['data']
         assert [message['text'] for message in result['messages'][:2]] == ['Hello', 'Welcome']
         assert result['messages'][2]['tools'][0]['result'] == 'Result password=[已脱敏]'
+        tool = result['messages'][2]['tools'][0]
+        assert tool['name'] == 'mcp__catalog__search'
+        assert json.loads(tool['args'])['query'] == 'example'
+        assert 'argument-secret' not in tool['args'] and 'header-secret' not in tool['args']
         assert calls == ['open', 'close']
     assert (home / 'state.db').read_bytes() == before
     with runtime.store.read() as connection:
@@ -94,3 +99,46 @@ def test_native_provider_remains_explicit_and_home_hash_keeps_local_history_read
     assert not calls
     result = HermesSessionContentProvider(local_admin=True).read('previous-instance-label', scope.profile_id, 's1')
     assert result['messages'][0]['text'] == 'Hello'
+
+
+def test_tool_content_disable_hides_both_arguments_and_results(local_sessions, monkeypatch):
+    _, scope, _ = local_sessions
+    monkeypatch.setenv('USAGE_MANAGER_TOOL_CONTENT', '0')
+    result = HermesSessionContentProvider(local_admin=True).read(scope.instance_id, scope.profile_id, 's1')
+    tool = result['messages'][2]['tools'][0]
+    assert tool['name'] == 'mcp__catalog__search'
+    assert tool['args'] == '[工具参数已隐藏]' and tool['result'] == '[工具结果已隐藏]'
+
+
+def test_tool_call_linking_across_page_and_reused_ids_is_bounded(local_sessions):
+    _, scope, _ = local_sessions
+    requests = []
+    rows = [
+        {'role': 'assistant', 'tool_calls': json.dumps([{'id': 'same', 'function': {'name': 'first', 'arguments': '{"value": 1}'}}])},
+        {'role': 'tool', 'tool_call_id': 'same', 'content': 'one'},
+        {'role': 'assistant', 'tool_calls': [{'id': 'same', 'function': {'name': 'second', 'arguments': {'value': 2}}}]},
+        {'role': 'tool', 'tool_call_id': 'same', 'content': 'two'},
+        {'role': 'tool', 'tool_call_id': 'missing', 'tool_name': 'orphan', 'content': 'no call'},
+    ]
+    class SessionDB:
+        def __init__(self, **kwargs):
+            assert kwargs['read_only'] is True
+        def get_session(self, session_id):
+            return {'profile_name': 'default'}
+        def get_messages(self, session_id, limit=None, offset=0, latest=False):
+            requests.append((offset, limit))
+            return rows[offset:offset + limit]
+        def close(self):
+            pass
+    provider = HermesSessionContentProvider(factory=SessionDB, local_admin=True)
+    first = provider.read(scope.instance_id, scope.profile_id, 's1', offset=1, limit=1)
+    assert first['messages'][0]['tools'][0]['name'] == 'first'
+    assert json.loads(first['messages'][0]['tools'][0]['args']) == {'value': 1}
+    assert first['pagination'] == {'offset': 1, 'limit': 1, 'has_more': True, 'returned': 1}
+    second = provider.read(scope.instance_id, scope.profile_id, 's1', offset=3, limit=2)
+    assert [t['name'] for t in second['messages'][0]['tools']] == ['second', 'orphan']
+    assert json.loads(second['messages'][0]['tools'][0]['args']) == {'value': 2}
+    assert second['messages'][0]['tools'][1]['args'] == '[当前读取范围未找到对应调用参数]'
+    assert second['pagination']['has_more'] is False
+    provider.read(scope.instance_id, scope.profile_id, 's1', offset=1000, limit=100)
+    assert requests[-1] == (800, 301)
