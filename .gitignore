@@ -1,9 +1,0 @@
-node_modules/
-.venv/
-__pycache__/
-.pytest_cache/
-frontend/.mock-dist/
-test-results/
-playwright-report/
-build/
-*.egg-info/
