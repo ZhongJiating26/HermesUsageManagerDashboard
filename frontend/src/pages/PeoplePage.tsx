@@ -1,6 +1,7 @@
 import { React } from '../platform/react-host';
 import { departmentSchema, userSchema, mutate, useResource, type Department, type User } from '../services/preview';
 import { Empty, Modal, Pagination, ResourceState, useDebounce } from '../components/common';
+import { Select } from '../components/Select';
 
 const departmentsSchema = departmentSchema.array();
 const usersSchema = userSchema.array();
@@ -14,7 +15,8 @@ export function PeoplePage({ refreshFilters }: { refreshFilters: () => void }) {
   const users = useResource('/people/users', usersSchema, revision);
   const [search, setSearch] = React.useState('');
   const term = useDebounce(search);
-  const [department, setDepartment] = React.useState('');
+  const [department, setDepartment] = React.useState('__all__');
+  const [editorDepartment, setEditorDepartment] = React.useState('');
   const [page, setPage] = React.useState(1);
   const [size, setSize] = React.useState(20);
   const [editor, setEditor] = React.useState<Editor | null>(null);
@@ -23,7 +25,7 @@ export function PeoplePage({ refreshFilters }: { refreshFilters: () => void }) {
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState('');
   const [left, setLeft] = React.useState('');
-  const [right, setRight] = React.useState('');
+  const [right, setRight] = React.useState('__initial__');
   const [leftSearch, setLeftSearch] = React.useState('');
   const [rightSearch, setRightSearch] = React.useState('');
   const [leftIds, setLeftIds] = React.useState<string[]>([]);
@@ -31,8 +33,8 @@ export function PeoplePage({ refreshFilters }: { refreshFilters: () => void }) {
   React.useEffect(() => { setPage(1); }, [term, department, tab, size]);
   React.useEffect(() => {
     if (departments.data) {
-      if (!departments.data.some((item) => item.id === left)) setLeft(departments.data[0]?.id ?? '');
-      if (!departments.data.some((item) => item.id === right)) setRight(departments.data[1]?.id ?? departments.data[0]?.id ?? '');
+      if (left && !departments.data.some((item) => item.id === left)) setLeft('');
+      if (right && !departments.data.some((item) => item.id === right)) setRight(departments.data[0]?.id ?? '');
     }
   }, [departments.data, left, right]);
   async function execute(action: () => Promise<void>) {
@@ -47,9 +49,10 @@ export function PeoplePage({ refreshFilters }: { refreshFilters: () => void }) {
   if (departments.loading || users.loading || departments.error || users.error) return <ResourceState loading={departments.loading || users.loading} error={departments.error || users.error} retry={() => { departments.retry(); users.retry(); }} />;
   const allDepartments = departments.data ?? [];
   const allUsers = users.data ?? [];
-  const visible = allUsers.filter((user) => (!department || user.department_id === department) && `${user.name} ${user.external_id}`.toLowerCase().includes(term.toLowerCase()));
-  const departmentName = (id: string) => allDepartments.find((item) => item.id === id)?.name ?? '未归属';
-  const openEditor = (value: Editor) => { setEditor(value); setError(null); };
+  const departmentOptions = [{ value: '', label: '未分配部门' }, ...allDepartments.map((item) => ({ value: item.id, label: item.name }))];
+  const visible = allUsers.filter((user) => (department === '__all__' || user.department_id === department) && `${user.name} ${user.external_id}`.toLowerCase().includes(term.toLowerCase()));
+  const departmentName = (id: string) => allDepartments.find((item) => item.id === id)?.name ?? '未分配部门';
+  const openEditor = (value: Editor) => { setEditor(value); setEditorDepartment(value.kind === 'user' ? value.item?.department_id ?? '' : ''); setError(null); };
   const ask = (value: Confirmation) => { setConfirmation(value); setError(null); };
   function assignment(side: 'left' | 'right') {
     const selectedDepartment = side === 'left' ? left : right;
@@ -58,13 +61,13 @@ export function PeoplePage({ refreshFilters }: { refreshFilters: () => void }) {
     const value = side === 'left' ? leftSearch : rightSearch;
     const matches = allUsers.filter((user) => user.department_id === selectedDepartment && `${user.name} ${user.external_id}`.includes(value));
     const label = side === 'left' ? '左侧' : '右侧';
-    return <div className="hum-assignment-side"><label className="hum-pill-select"><select aria-label={`${label}部门`} value={selectedDepartment} onChange={(event) => { (side === 'left' ? setLeft : setRight)(event.target.value); setIds([]); }}>{allDepartments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+    return <div className="hum-assignment-side"><Select label={`${label}部门`} value={selectedDepartment} options={departmentOptions} onChange={(value) => { (side === 'left' ? setLeft : setRight)(value); setIds([]); }} />
       <div className="hum-assignment-list"><div className="hum-assignment-search"><input type="checkbox" aria-label={`${label}全选`} checked={matches.length > 0 && matches.every((user) => selectedIds.includes(user.id))} onChange={(event) => setIds(event.target.checked ? matches.map((user) => user.id) : [])} /><span>({matches.length})</span><input aria-label={`${label}搜索用户`} placeholder="搜索用户" value={value} onChange={(event) => (side === 'left' ? setLeftSearch : setRightSearch)(event.target.value)} /></div>
         {matches.length === 0 && <Empty text="该部门暂无匹配成员" />}{matches.map((user) => <label className="hum-person" key={user.id}><input type="checkbox" checked={selectedIds.includes(user.id)} onChange={(event) => setIds(event.target.checked ? [...selectedIds, user.id] : selectedIds.filter((id) => id !== user.id))} /><span>{user.name}</span><small>{user.id}</small></label>)}
       </div></div>;
   }
   return <div className="hum-stack"><div className="hum-toolbar"><div className="hum-tabs" role="tablist" aria-label="人员设置分类">{[['users', '用户列表'], ['departments', '部门列表'], ['assignment', '部门分配']].map(([id, label]) => <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>)}</div>
-    {tab === 'users' && <><select aria-label="人员部门筛选" value={department} onChange={(event) => setDepartment(event.target.value)}><option value="">全部部门</option>{allDepartments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><input className="hum-search" aria-label="搜索用户" placeholder="搜索用户 / Open ID" value={search} onChange={(event) => setSearch(event.target.value)} /><button onClick={() => openEditor({ kind: 'user' })}>＋ 新增映射</button></>}
+    {tab === 'users' && <><Select label="人员部门筛选" value={department} onChange={setDepartment} options={[{ value: '__all__', label: '全部部门' }, ...departmentOptions]} /><input className="hum-search" aria-label="搜索用户" placeholder="搜索用户 / Open ID" value={search} onChange={(event) => setSearch(event.target.value)} /><button onClick={() => openEditor({ kind: 'user' })}>＋ 新增映射</button></>}
     {tab === 'departments' && <button onClick={() => openEditor({ kind: 'department' })}>⊕ 新建部门</button>}</div>
     {notice && <p className="hum-notice" role="status">{notice}</p>}
     {tab === 'users' && (visible.length ? <><div className="hum-table-scroll"><table><thead><tr><th>飞书 open_id</th><th>用户</th><th>部门</th><th>Profile</th><th>操作</th></tr></thead><tbody>{visible.slice((page - 1) * size, page * size).map((user) => <tr key={user.id}><td>{user.external_id}</td><td>{user.name}</td><td>{departmentName(user.department_id)}</td><td>{user.profile}</td><td><button className="hum-text" onClick={() => openEditor({ kind: 'user', item: user })} aria-label={`编辑用户 ${user.name}`}>编辑</button></td></tr>)}</tbody></table></div><Pagination page={page} size={size} total={visible.length} onPage={setPage} onSize={setSize} /></> : <Empty />)}
@@ -74,7 +77,7 @@ export function PeoplePage({ refreshFilters }: { refreshFilters: () => void }) {
       event.preventDefault(); const values = new FormData(event.currentTarget); const name = String(values.get('name') ?? '').trim();
       if (editor.kind === 'department') void execute(() => mutate(`/people/departments${editor.item ? `/${editor.item.id}` : ''}`, editor.item ? 'PATCH' : 'POST', { name }));
       else void execute(() => mutate(`/people/users${editor.item ? `/${editor.item.id}` : ''}`, editor.item ? 'PATCH' : 'POST', { name, external_id: values.get('external_id'), department_id: values.get('department_id'), profile: values.get('profile'), platform: editor.item?.platform ?? 'feishu' }));
-    }}><label>名称<input name="name" required maxLength={50} defaultValue={editor.item?.name ?? ''} /></label>{editor.kind === 'user' && <><label>Open ID<input name="external_id" required maxLength={100} defaultValue={editor.item?.external_id ?? ''} /></label><label>主部门<select name="department_id" defaultValue={editor.item?.department_id ?? allDepartments[0]?.id}>{allDepartments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Profile<input name="profile" required defaultValue={editor.item?.profile ?? 'profile-1'} /></label></>}{error && <p role="alert">{error}</p>}<div className="hum-form-actions"><button type="button" className="hum-outline" disabled={busy} onClick={() => setEditor(null)}>取消</button><button disabled={busy}>{busy ? '保存中…' : '保存'}</button></div></form></Modal>}
+    }}><label>名称<input name="name" required maxLength={50} defaultValue={editor.item?.name ?? ''} /></label>{editor.kind === 'user' && <><label>Open ID<input name="external_id" required maxLength={100} defaultValue={editor.item?.external_id ?? ''} /></label><div className="hum-form-field"><span>主部门</span><Select label="主部门" name="department_id" value={editorDepartment} onChange={setEditorDepartment} options={departmentOptions} /></div><label>Profile<input name="profile" required defaultValue={editor.item?.profile ?? 'profile-1'} /></label></>}{error && <p role="alert">{error}</p>}<div className="hum-form-actions"><button type="button" className="hum-outline" disabled={busy} onClick={() => setEditor(null)}>取消</button><button disabled={busy}>{busy ? '保存中…' : '保存'}</button></div></form></Modal>}
     {confirmation && <Modal title={confirmation.title} onClose={() => { if (!busy) setConfirmation(null); }}><p>{confirmation.text}</p>{error && <p role="alert">{error}</p>}<div className="hum-form-actions"><button className="hum-outline" disabled={busy} onClick={() => setConfirmation(null)}>取消</button><button disabled={busy} onClick={() => void execute(confirmation.action)}>{busy ? '处理中…' : '确认'}</button></div></Modal>}
   </div>;
 }

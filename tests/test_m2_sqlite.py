@@ -236,6 +236,39 @@ def test_department_move_preserves_events_and_rolls_back_invalid_batch(runtime, 
         assert connection.execute('SELECT count(*) FROM department_membership').fetchone()[0] == 2
 
 
+def test_unassign_department_closes_membership_without_rewriting_history(runtime, client):
+    with runtime.store.transaction() as c:
+        c.execute("INSERT INTO departments(id,name) VALUES('d1','One')")
+        c.execute("INSERT INTO users(id,name,external_id,department_id) VALUES('u1','User','e1','d1')")
+        c.execute("INSERT INTO department_membership VALUES('initial','u1','d1','2026-01-01T00:00:00.000000+00:00',NULL)")
+        events.ingest_model(c, model(user_id='u1', department_id='d1'))
+    path = PREFIX + '/people/assignments/move'
+    assert client.post(path, json={'user_ids': ['u1', 'missing'], 'department_id': ''}).status_code == 422
+    assert client.post(path, json={'user_ids': ['u1'], 'department_id': ''}).status_code == 200
+    assert client.post(path, json={'user_ids': ['u1'], 'department_id': ''}).status_code == 200
+    with runtime.store.read() as c:
+        assert c.execute('SELECT department_id FROM users').fetchone()[0] is None
+        assert c.execute('SELECT valid_to FROM department_membership').fetchone()[0] is not None
+        assert c.execute('SELECT count(*) FROM department_membership').fetchone()[0] == 1
+        assert c.execute('SELECT department_id FROM llm_requests').fetchone()[0] == 'd1'
+    assert client.get(PREFIX + '/people/users').json()['data'][0]['department_id'] == ''
+    assert client.post(path, json={'user_ids': ['u1'], 'department_id': 'd1'}).status_code == 200
+    with runtime.store.read() as c:
+        assert c.execute('SELECT department_id FROM users').fetchone()[0] == 'd1'
+        assert c.execute('SELECT count(*) FROM department_membership WHERE valid_to IS NULL').fetchone()[0] == 1
+
+
+def test_create_and_edit_user_without_department(runtime, client):
+    body = {'name': 'Unassigned', 'external_id': 'external-unassigned', 'profile': 'p1', 'department_id': ''}
+    response = client.post(PREFIX + '/people/users', json=body)
+    assert response.status_code == 200
+    user_id = response.json()['data']['id']
+    assert client.patch(PREFIX + '/people/users/' + user_id, json=body | {'name': 'Updated'}).status_code == 200
+    with runtime.store.read() as c:
+        assert c.execute('SELECT department_id FROM users WHERE id=?', (user_id,)).fetchone()[0] is None
+        assert c.execute('SELECT count(*) FROM department_membership').fetchone()[0] == 0
+
+
 @pytest.mark.parametrize('role', ['department', 'user'])
 def test_scope_and_all_sensitive_routes_enforce_server_permissions(runtime, client, role):
     insert(runtime, model(user_id='u1', department_id='d1'))

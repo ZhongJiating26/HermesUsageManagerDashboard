@@ -58,7 +58,9 @@ def require_department(connection, department_id):
 
 
 def assign(connection, principal, user_ids, department_id):
-    require_department(connection, department_id)
+    if department_id:
+        require_department(connection, department_id)
+    department_id = department_id or None
     unique = set(user_ids)
     existing = {row[0] for row in connection.execute(f"SELECT id FROM users WHERE status='active' AND id IN ({','.join('?' for _ in unique)})", tuple(unique))}
     if existing != unique:
@@ -69,6 +71,7 @@ def assign(connection, principal, user_ids, department_id):
         if current == department_id:
             continue
         connection.execute("UPDATE department_membership SET valid_to=? WHERE user_id=? AND valid_to IS NULL", (stamp, user_id))
-        connection.execute("INSERT INTO department_membership VALUES(?,?,?,?,NULL)", (uuid4().hex, user_id, department_id, stamp))
+        if department_id is not None:
+            connection.execute("INSERT INTO department_membership VALUES(?,?,?,?,NULL)", (uuid4().hex, user_id, department_id, stamp))
         connection.execute("UPDATE users SET department_id=? WHERE id=?", (department_id, user_id))
         audit(connection, principal, "people.move", user_id)

@@ -51,19 +51,19 @@ def test_session_reader_negotiates_explicit_v021_and_newer_signatures(tmp_path, 
             return {'profile_name': 'p1'}
         def get_messages(self, session_id, include_inactive=False, include_compacted=False, limit=None, offset=0, latest=False, after_id=None):
             calls.append((limit, offset, latest))
-            return [{'id': 1, 'session_id': session_id, 'role': 'user', 'content': 'Allowed'}]
+            return [{'id': index + 1, 'session_id': session_id, 'role': 'user', 'content': 'Allowed'} for index in range(offset, min(offset + limit, 21))]
         def close(self):
             calls.append('closed')
     if newer:
         def get_messages(self, session_id, limit=None, offset=0, latest=False, include_ancestors=True):
             assert include_ancestors is False
             calls.append((limit, offset, latest))
-            return [{'id': 1, 'role': 'user', 'content': 'Allowed'}]
+            return [{'id': index + 1, 'role': 'user', 'content': 'Allowed'} for index in range(offset, min(offset + limit, 21))]
         SessionDB.get_messages = get_messages
     monkeypatch.setenv('USAGE_MANAGER_SESSION_CONTENT', '1')
     provider = content.HermesSessionContentProvider(SessionDB, {'i1/p1': str(home)})
     result = provider.read('i1', 'p1', 's1', offset=20, limit=10)
-    assert calls == [(11, 20, False), 'closed']
+    assert calls == [(31, 0, False), 'closed']
     assert result['messages'][0]['text'] == 'Allowed'
 
 

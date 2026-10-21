@@ -36,10 +36,10 @@ test('review changes use local Material Symbols and hide explanatory notes until
 test('filter pills have no prefixed text and all pie values appear only on hover', async ({ page }) => {
   await page.goto('/?hum_page=usage');
   await expect(page.locator('.hum-chart')).toHaveCount(4);
-  const prefix = await page.getByLabel('部门筛选').locator('..').evaluate((element) => Array.from(element.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent).join('').trim());
+  const prefix = await page.getByRole('combobox', { name: '部门筛选', exact: true }).locator('..').evaluate((element) => Array.from(element.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent).join('').trim());
   expect(prefix).toBe('');
-  const style = await page.getByLabel('部门筛选').evaluate((element) => ({ radius: getComputedStyle(element).borderRadius, appearance: getComputedStyle(element).appearance, repeat: getComputedStyle(element).backgroundRepeat }));
-  expect(style).toEqual({ radius: '999px', appearance: 'none', repeat: 'no-repeat' });
+  const style = await page.getByRole('combobox', { name: '部门筛选', exact: true }).evaluate((element) => ({ radius: getComputedStyle(element).borderRadius, tag: element.tagName }));
+  expect(style).toEqual({ radius: '999px', tag: 'BUTTON' });
   for (const name of ['人员用量', '模型用量']) {
     const chart = page.locator('.hum-card').filter({ has: page.getByRole('heading', { name, exact: true }) }).locator('.hum-chart');
     await expect(chart).not.toContainText(/Tokens|%/);

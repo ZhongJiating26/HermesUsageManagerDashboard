@@ -1,6 +1,11 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 
+async function select(page: Page, label: string, value: string) {
+  await page.getByRole('combobox', { name: label, exact: true }).click();
+  await page.getByRole('listbox').locator(`[role=option][data-value="${value}"]`).click();
+}
+
 async function navigate(page: Page, name: string) {
   await page.getByRole('navigation').getByRole('button', { name }).click();
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
@@ -20,18 +25,18 @@ test('charts follow filters, metrics and drill-down; all prototype pages render'
   await departmentCard.locator('.hum-chart-data>summary').click();
   await departmentCard.getByRole('button', { name: '研发部' }).click();
   await expect(page.getByRole('heading', { name: '用量明细', exact: true })).toBeVisible();
-  await expect(page.getByLabel('部门筛选')).toHaveValue('d1');
+  await expect(page.getByRole('combobox', { name: '部门筛选', exact: true })).toHaveAttribute('data-value', 'd1');
   await expect(page.locator('tbody tr')).toHaveCount(20);
   await navigate(page, '使用分析');
-  await page.getByLabel('部门筛选').selectOption('d2');
+  await select(page, '部门筛选', 'd2');
   await expect(page.locator('.hum-chart')).toHaveCount(4);
   await page.screenshot({ path: '../build/m1/usage.png', fullPage: true });
   await navigate(page, 'MCP 分析');
-  await page.getByLabel('MCP 服务筛选').selectOption('catalog');
+  await select(page, 'MCP 服务筛选', 'catalog');
   await expect(page.locator('.hum-chart')).toHaveCount(2);
   await page.locator('summary').filter({ hasText: '全部工具详情' }).click();
   await expect(page.locator('tbody tr')).toHaveCount(8);
-  await page.getByLabel('MCP 服务筛选').selectOption('');
+  await select(page, 'MCP 服务筛选', '');
   await expect(page.locator('tbody tr')).toHaveCount(15);
   await page.locator('.hum-chart').last().locator('svg path[fill="#9980d0"]').first().hover();
   await expect(page.locator('.hum-chart').last()).toContainText('接口标识');
@@ -47,11 +52,13 @@ test('request pagination, sort, unknown fields and modal without a search toolba
   await page.getByRole('button', { name: '下一页' }).click();
   await expect(page.locator('.hum-page-number')).toContainText('2/');
   await expect(page.locator('tbody tr').first()).not.toHaveText(first);
-  await page.getByLabel('每页条数').selectOption('50');
+  await select(page, '每页条数', '50');
   await expect(page.locator('tbody tr')).toHaveCount(50);
   await page.getByRole('button', { name: '输入 ↕' }).click();
-  await page.getByLabel('部门筛选').selectOption('d1');
-  await expect(page.getByLabel('人员筛选').locator('option')).toHaveCount(5);
+  await select(page, '部门筛选', 'd1');
+  await page.getByRole('combobox', { name: '人员筛选', exact: true }).click();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(5);
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '清除筛选' }).click();
   await expect(page.getByLabel('搜索请求或模型')).toHaveCount(0);
   await page.getByRole('button', { name: /请求时间/ }).click();
@@ -69,7 +76,7 @@ test('request pagination, sort, unknown fields and modal without a search toolba
 
 test('custom date validates, empty state does not draw zero charts', async ({ page }) => {
   await page.goto('/');
-  await page.getByLabel('日期范围').selectOption('custom');
+  await select(page, '日期范围', 'custom');
   await page.getByLabel('开始日期').fill('2026-10-20');
   await page.getByLabel('结束日期').fill('2026-10-15');
   await page.getByRole('button', { name: '应用', exact: true }).click();
@@ -124,7 +131,8 @@ test('department create/edit/delete and blocked deletion show server feedback', 
 test('assignment confirms migration, prevents same-department moves; user mapping edits', async ({ page }) => {
   await page.goto('/?hum_page=people');
   await page.getByRole('tab', { name: '部门分配' }).click();
-  await expect(page.getByLabel('左侧部门')).toHaveValue('d1');
+  await select(page, '左侧部门', 'd1');
+  await select(page, '右侧部门', 'd2');
   await page.screenshot({ path: '../build/m1/people-assignment.png', fullPage: true });
   const leftList = page.locator('.hum-assignment-side').first();
   const person = await leftList.locator('.hum-person').first().locator('span').innerText();
@@ -133,7 +141,7 @@ test('assignment confirms migration, prevents same-department moves; user mappin
   await expect(page.getByRole('dialog')).toContainText('1 人迁移到');
   await page.getByRole('button', { name: '确认', exact: true }).click();
   await expect(page.locator('.hum-assignment-side').last().getByText(person, { exact: true })).toBeVisible();
-  await page.getByLabel('右侧部门').selectOption('d1');
+  await select(page, '右侧部门', 'd1');
   await expect(page.getByRole('button', { name: /移到右侧/ })).toBeDisabled();
   await page.getByRole('tab', { name: '用户列表' }).click();
   await page.getByLabel('搜索用户', { exact: true }).fill(person);
@@ -154,6 +162,50 @@ test('prices add a new effective version and preserve original', async ({ page }
   await expect(page.locator('tbody tr')).toHaveCount(6);
   await expect(page.locator('tbody')).toContainText('2026-10-01');
   await expect(page.locator('tbody')).toContainText('2026-10-16');
+});
+
+test('custom dropdowns support unassigned departments, keyboard and both migration directions', async ({ page }) => {
+  await page.goto('/?hum_page=people');
+  await page.getByRole('button', { name: '新增映射' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('名称', { exact: true }).fill('未分配测试成员');
+  await dialog.getByLabel('Open ID').fill('unassigned-browser-test');
+  const department = dialog.getByRole('combobox', { name: '主部门' });
+  await expect(department).toHaveText('未分配部门');
+  await department.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('listbox')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
+  await expect(department).toBeFocused();
+  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await select(page, '人员部门筛选', '');
+  await expect(page.locator('tbody')).toContainText('未分配测试成员');
+  await page.getByRole('tab', { name: '部门分配' }).click();
+  const left = page.locator('.hum-assignment-side').first();
+  const right = page.locator('.hum-assignment-side').last();
+  await expect(page.getByRole('combobox', { name: '左侧部门' })).toHaveText('未分配部门');
+  await left.locator('.hum-person').filter({ hasText: '未分配测试成员' }).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '移到右侧 (1)' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '确认', exact: true }).click();
+  await expect(right).toContainText('未分配测试成员');
+  await expect(left).not.toContainText('未分配测试成员');
+  await right.locator('.hum-person').filter({ hasText: '未分配测试成员' }).getByRole('checkbox').check();
+  await page.getByRole('button', { name: '← 移到左侧 (1)' }).click();
+  await expect(page.getByRole('dialog')).toContainText('未分配部门');
+  await page.getByRole('dialog').getByRole('button', { name: '确认', exact: true }).click();
+  await expect(left).toContainText('未分配测试成员');
+  await page.reload();
+  await page.getByRole('tab', { name: '部门分配' }).click();
+  await expect(page.locator('.hum-assignment-side').first()).toContainText('未分配测试成员');
+  await expect(page.locator('.hum-root select')).toHaveCount(0);
+  await page.getByRole('combobox', { name: '左侧部门' }).click();
+  await expect(page.getByRole('option', { name: '未分配部门', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('listbox')).toBeVisible();
+  await page.screenshot({ path: '../build/unassigned-dropdown.png', animations: 'disabled' });
+  await page.getByRole('heading').first().click();
+  await expect(page.getByRole('listbox')).not.toBeVisible();
 });
 
 test('error, empty, denied and slow scenarios are explicit', async ({ page }) => {

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { React } from '../platform/react-host';
+import { Select } from './Select';
 
 export const number = (value: number | null | undefined) => value == null ? '—' : new Intl.NumberFormat('zh-CN').format(value);
 export const compact = (value: number | null) => value == null ? '—' : new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
@@ -19,7 +20,7 @@ export function Empty({ text = '当前筛选范围暂无数据' }: { text?: stri
 export function Pagination({ page, total, size, onPage, onSize }: { page: number; total: number; size: number; onPage: (page: number) => void; onSize: (size: number) => void }) {
   const pages = Math.max(1, Math.ceil(total / size));
   React.useEffect(() => { if (page > pages) onPage(pages); }, [page, pages, onPage]);
-  return <div className="hum-pagination"><span>共 {number(total)} 条</span><label>每页 <select aria-label="每页条数" value={size} onChange={(event) => onSize(Number(event.target.value))}>{[20, 50, 100].map((value) => <option key={value}>{value}</option>)}</select></label><button className="hum-outline" aria-label="上一页" disabled={page <= 1} onClick={() => onPage(page - 1)}>‹</button><span className="hum-page-number">{page}/{pages}</span><button className="hum-outline" aria-label="下一页" disabled={page >= pages} onClick={() => onPage(page + 1)}>›</button></div>;
+  return <div className="hum-pagination"><span>共 {number(total)} 条</span><span>每页</span><Select label="每页条数" value={String(size)} onChange={(value) => onSize(Number(value))} options={[20, 50, 100].map((value) => ({ value: String(value), label: String(value) }))} /><button className="hum-outline" aria-label="上一页" disabled={page <= 1} onClick={() => onPage(page - 1)}>‹</button><span className="hum-page-number">{page}/{pages}</span><button className="hum-outline" aria-label="下一页" disabled={page >= pages} onClick={() => onPage(page + 1)}>›</button></div>;
 }
 
 export function Modal({ title, children, onClose, drawer = false }: { title: string; children: ReactNode; onClose: () => void; drawer?: boolean }) {
