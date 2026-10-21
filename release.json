@@ -1,12 +1,12 @@
 {
   "files": {
-    "CHANGELOG.md": "abb91862f92932c07af695f6127e9ee17f91db9c7c4bec8c9b6a0ed958efed18",
+    "CHANGELOG.md": "6b3552a59f6c12aacebe2bd53a272ad4ee425c497431ceaf1540abe12b151338",
     "README.md": "6dae0ee9327e672adcb3011fba9bf8836c5c31da864fa6b8bd47d535f826d0f2",
     "__init__.py": "b5673fe796091f6d578484ad6d6725332a44d57f9307d45ddcae212715627029",
     "backend/__init__.py": "ed1fafd50ce033cf0aa3abe4488c7e8063fdd18e5b47a845e22ff08dc8f5e8c7",
     "backend/adapters/__init__.py": "d8370d1d4d8b5f72c26ef0fd57681beb38a88092029b22e6d344f0244ff8cc55",
     "backend/adapters/hermes.py": "d9d7330b2c98dd4566db53971dc45edaa69fc7d91daa64eb1ff3a22ab0086c1a",
-    "backend/adapters/hooks.py": "debf9c692659ded28c5b422216ab975811f53d95714008ccbe363bff6270d42f",
+    "backend/adapters/hooks.py": "59807598513b78e8be0c5451524b688c781d4b94a7b5258a4b5abe54ba899a2a",
     "backend/adapters/session_content.py": "7251793e1c08e0f696b141a0d4330fbcf11d6ed49e11cf017ae0ee3dad76c72c",
     "backend/admin.py": "3d8868b1067bbb508216492e74cabca8e37de220fda969baed7ef9ac393a3f2b",
     "backend/api.py": "2b2800f372eb98dcbf251a25ad93e2b853b859037036ee7f67b81390f1521902",
@@ -72,7 +72,7 @@
   "name": "hermes-usage-manager",
   "release_status": "candidate",
   "source_dirty": false,
-  "source_revision": "1909bb0d10843a19a101a5b6b54e014349e507b0",
+  "source_revision": "d76b095b9c284415bcbd56ff469fdda5ddeb241f",
   "source_tag": null,
   "version": "0.6.0"
 }
