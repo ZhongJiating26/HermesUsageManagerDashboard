@@ -4,6 +4,10 @@
 
 ## 基础配置
 
+供应商名称：当Hermes调用事件仅返回custom、auto或custom:变体时，插件只读当前Hermes Home的config.yaml，按该次调用base_url精确匹配providers/custom_providers条目。当前model.provider仅在model.base_url也匹配时优先；多个名称歧义、地址缺失或配置不可读时保留原始标识。原本有明确名称的供应商不改写。解析缓存只保留名称与地址，不保留API Key；事件与采集库不增加地址或凭据字段。费用按最终供应商名称匹配有效价格，不能确认价格时保持未知。
+
+人员部门：请求中的空department_id表示“未分配部门”，数据库保存NULL。撤销部门会关闭当前department_membership区间，不创建虚假部门，不改写已有请求或工具记录的历史部门快照。重新分配时创建新的有效区间；普通用户与部门角色不能执行这些管理员写操作。
+
 推荐先执行安装目录的`bash install.sh`：自动保存当前Hermes Home下`plugin-data/hermes-usage-manager/settings.json`，Hooks、原生Dashboard与独立入口共用其中的数据库路径，元数据采集随引导显式启用。没有设置文件且没有采集环境变量时仍默认关闭采集。`USAGE_MANAGER_DB_PATH`和`USAGE_MANAGER_COLLECTION`显式环境变量优先（包括值0），实例ID继续自动生成，无需手动配置。更改设置后按原运行方式重启相关进程。独立凭据路径也存入设置文件，重复setup保留数据及密码。其他权限变量不因安装引导而启用。
 
 以下是仍支持的手动环境变量方式；已有服务若设置过旧值，需要先调整，否则会覆盖安装引导保存的默认配置。

@@ -287,7 +287,8 @@ def move(body: MoveBody, runtime=Depends(get_runtime), principal=Depends(get_pri
 def save_user(body: UserBody, user_id: str = "", runtime=Depends(get_runtime), principal=Depends(get_principal)):
     require(principal, "write")
     with runtime.store.transaction() as connection:
-        admin.require_department(connection, body.department_id)
+        if body.department_id:
+            admin.require_department(connection, body.department_id)
         if user_id:
             if not connection.execute("SELECT 1 FROM users WHERE id=? AND status='active'", (user_id,)).fetchone():
                 raise HTTPException(404, "用户不存在")

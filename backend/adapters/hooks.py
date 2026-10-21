@@ -7,6 +7,7 @@ from threading import Lock
 from time import monotonic
 
 from ..events import ModelEvent, ToolEvent, key
+from .providers import resolve_provider
 
 HOOKS = ('pre_llm_call', 'post_api_request', 'api_request_error', 'post_tool_call', 'on_session_end')
 UNAVAILABLE_HOOKS = ('post_auxiliary_call',)
@@ -111,6 +112,7 @@ class Normalizer:
         provider = identifier(payload.get('provider'), required=True, maximum=100)
         if '://' in provider or '?' in provider or re.search(r'\s', provider):
             raise ValueError('INVALID_PROVIDER')
+        provider = resolve_provider(provider, payload.get('base_url'))
         failed = name == 'api_request_error' or name == 'post_auxiliary_call' and (payload.get('error_type') is not None or payload.get('error') is not None)
         attempt = count(payload.get('retry_count'))
         attempt = attempt if attempt is not None else max(0, (count(payload.get('api_call_count')) or 1) - 1)
