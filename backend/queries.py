@@ -7,8 +7,8 @@ from .security import require
 def where(window, principal, alias="", tools=False):
     require(principal, "read")
     prefix = f"{alias}." if alias else ""
-    clauses = [f"{prefix}occurred_at>=?", f"{prefix}occurred_at<?"]
-    values = [window.start, window.end]
+    clauses = ["1=1"] if window.all_time else [f"{prefix}occurred_at>=?", f"{prefix}occurred_at<?"]
+    values = [] if window.all_time else [window.start, window.end]
     for field, value in (("department_id", window.department_id), ("user_id", window.user_id), ("department_id", principal.department_id if principal.role == "department" else None), ("user_id", principal.user_id if principal.role == "user" else None)):
         if value:
             clauses.append(f"{prefix}{field}=?")
@@ -66,18 +66,36 @@ def analytics(connection, window, principal):
     activity = f"SELECT occurred_at,user_id FROM llm_requests WHERE {condition} UNION ALL SELECT occurred_at,user_id FROM tool_calls WHERE {activity_condition}"
     activity_values = [*values, *activity_tools]
     kpis['active'] = connection.execute(f"SELECT count(DISTINCT user_id) FROM ({activity})", activity_values).fetchone()[0]
-    active_days = {item['day']: item['active'] for item in rows(connection, f"SELECT local_day(occurred_at,?) AS day,count(DISTINCT user_id) AS active FROM ({activity}) GROUP BY day", [window.tz, *activity_values])}
-    daily = {item["day"]: item for item in rows(connection, f"SELECT local_day(occurred_at,?) AS day,count(DISTINCT user_id) AS active,{sums} FROM llm_requests WHERE {condition} GROUP BY day", [window.tz, *values])}
-    calls = {item["day"]: item["calls"] for item in rows(connection, f"SELECT local_day(occurred_at,?) AS day,count(*) AS calls FROM tool_calls WHERE {tool_condition} GROUP BY day", [window.tz, *tool_values])}
-    trend = []
     day = datetime.fromisoformat(window.start).astimezone(window.zone).date()
     end = datetime.fromisoformat(window.end).astimezone(window.zone).date()
-    while day < end or (day == end and datetime.fromisoformat(window.end).astimezone(window.zone).time().isoformat() != '00:00:00'):
-        key = day.isoformat()
+    if window.all_time:
+        bounds = connection.execute(f'SELECT min(occurred_at),max(occurred_at) FROM ({activity})', activity_values).fetchone()
+        if bounds[0]:
+            day = datetime.fromisoformat(bounds[0]).astimezone(window.zone).date()
+            end = datetime.fromisoformat(bounds[1]).astimezone(window.zone).date() + timedelta(days=1)
+    elif datetime.fromisoformat(window.end).astimezone(window.zone).time().isoformat() != '00:00:00':
+        end += timedelta(days=1)
+    span = (end - day).days
+    interval = 'year' if span > 365 * 20 else 'month' if span > 366 else 'day'
+    width = {'day': 10, 'month': 7, 'year': 4}[interval]
+    bucket = f'substr(local_day(occurred_at,?),1,{width})'
+    active_days = {item['day']: item['active'] for item in rows(connection, f"SELECT {bucket} AS day,count(DISTINCT user_id) AS active FROM ({activity}) GROUP BY day", [window.tz, *activity_values])}
+    daily = {item["day"]: item for item in rows(connection, f"SELECT {bucket} AS day,count(DISTINCT user_id) AS active,{sums} FROM llm_requests WHERE {condition} GROUP BY day", [window.tz, *values])}
+    calls = {item["day"]: item["calls"] for item in rows(connection, f"SELECT {bucket} AS day,count(*) AS calls FROM tool_calls WHERE {tool_condition} GROUP BY day", [window.tz, *tool_values])}
+    if interval != 'day':
+        day = day.replace(day=1, month=1 if interval == 'year' else day.month)
+    trend = []
+    while day < end:
+        key = day.isoformat()[:width]
         item = daily.get(key, {"day": key, "input": 0, "cached": 0, "output": 0, "total_tokens": 0, "active": 0})
         item['active'] = active_days.get(key, 0)
         trend.append({field: item[field] for field in ("day", "input", "cached", "output", "total_tokens", "active")} | {"calls": calls.get(key, 0)})
-        day += timedelta(days=1)
+        if interval == 'day':
+            day += timedelta(days=1)
+        elif interval == 'month':
+            day = day.replace(year=day.year + (day.month == 12), month=1 if day.month == 12 else day.month + 1)
+        else:
+            day = day.replace(year=day.year + 1)
     tools = rows(connection, f"SELECT mcp_server_id AS server_id,tool_id, min(tool_name) AS name,count(*) AS calls,sum(status='failed') AS failed,cast(avg(duration_ms) AS INTEGER) AS duration_ms FROM tool_calls WHERE {tool_condition} GROUP BY mcp_server_id,tool_id ORDER BY calls DESC,server_id,tool_id", tool_values)
     for item in tools:
         item["id"] = f"{item['server_id']}:{item['tool_id']}"
