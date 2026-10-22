@@ -4,6 +4,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from ..config import hermes_home
+from .people import parse_session, owner
 
 
 def user_history(connection, department_id='', user_id='', *, home=None, profile_name=None):
@@ -26,30 +27,24 @@ def user_history(connection, department_id='', user_id='', *, home=None, profile
         core.row_factory = sqlite3.Row
         core.execute('PRAGMA query_only=ON')
         core.execute('BEGIN')
-        sessions = core.execute('SELECT id,source,user_id,parent_session_id,profile_name FROM sessions').fetchmany(100001)
+        columns = {row[1] for row in core.execute('PRAGMA table_info(sessions)')}
+        fields = ['id', 'source', 'user_id', 'parent_session_id', 'profile_name'] + [k for k in ('chat_type', 'origin_json') if k in columns]
+        sessions = core.execute('SELECT ' + ','.join(fields) + ' FROM sessions').fetchmany(100001)
         records = core.execute('SELECT session_id,input_tokens,cache_read_tokens,cache_write_tokens,output_tokens,api_call_count FROM session_model_usage').fetchmany(100001)
     finally:
         core.close()
     if len(sessions) > 100000 or len(records) > 100000:
         raise ValueError('History exceeds bounded read')
     owned = {r['id']: r for r in sessions if r['profile_name'] in (None, profile_name)}
-    def owner(sid):
-        seen = set()
-        while sid in owned and sid not in seen:
-            seen.add(sid)
-            row = owned[sid]
-            uid = mapping.get((row['source'], row['user_id']))
-            if uid:
-                return uid
-            if row['source'] != 'subagent':
-                break
-            sid = row['parent_session_id']
-        return ''
+    identities = {sid: parse_session(row, profile_name) for sid, row in owned.items()}
+    def user_owner(sid):
+        identity = owner(identities, sid)
+        return mapping.get((identity['platform'], identity['external_id']), '') if identity else ''
     grouped = defaultdict(lambda: {'tokens': 0, 'api_calls': 0, 'sessions': set(), 'unknown_rows': 0, 'known_rows': 0})
     for row in records:
         if row['session_id'] not in owned:
             continue
-        uid = owner(row['session_id'])
+        uid = user_owner(row['session_id'])
         if user_id and uid != user_id:
             continue
         if department_id and users.get(uid, {}).get('department_id') != department_id:
@@ -67,4 +62,4 @@ def user_history(connection, department_id='', user_id='', *, home=None, profile
     result = [{'id': uid, 'name': users.get(uid, {}).get('name', '未归属'), **{k: v for k, v in values.items() if k != 'known_rows'}, 'tokens': values['tokens'] if values['known_rows'] else None, 'sessions': len(values['sessions'])} for uid, values in grouped.items()]
     result.sort(key=lambda r: (r['tokens'] is None, -(r['tokens'] or 0), r['name']))
     return {'available': True, 'source': 'hermes_session_model_usage', 'scope': 'current_hermes_home', 'users': result[:100], 'total_users': len(result),
-            'message': 'Hermes 已保存的历史汇总，包含主调用与辅助调用；独立展示，不与逐次采集记录相加。部门筛选按当前人员归属。'}
+            'message': 'Hermes 已保存的历史汇总，包含主调用与辅助调用；独立展示，不与逐次采集记录相加。部门筛选按当前人员归属；无法按发言者拆分的群聊汇总保持未归属。'}

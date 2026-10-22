@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from .db import utc, now
 from .identity import resolve
+from .people import prepare
 
 
 def key(*parts):
@@ -26,6 +27,8 @@ class ModelEvent(BaseModel):
     user_id: str | None = None
     department_id: str | None = None
     external_user_id: str | None = None
+    external_user_name: str | None = None
+    identity_source: str = 'unknown'
     platform: str | None = None
     provider_usage_schema: str = 'normalized/v1'
     error_code: str | None = None
@@ -59,6 +62,8 @@ class ToolEvent(BaseModel):
     user_id: str | None = None
     department_id: str | None = None
     external_user_id: str | None = None
+    external_user_name: str | None = None
+    identity_source: str = 'unknown'
     platform: str | None = None
     turn_id: str | None = None
     time_source: str = 'normalized'
@@ -98,6 +103,7 @@ def ingest_model(connection, event):
     event_key = key(event.instance_id, event.profile_id, "model", event.source_event_id)
     if connection.execute("SELECT 1 FROM llm_requests WHERE event_key=?", (event_key,)).fetchone():
         return False
+    event = prepare(connection, event)
     user_id, department_id, identity_status = resolve(connection, event)
     event = event.model_copy(update={'user_id': user_id, 'department_id': department_id})
     session_key = session(connection, event)
@@ -116,6 +122,7 @@ def ingest_model(connection, event):
     revision = connection.execute("SELECT id FROM price_revisions WHERE price_id=? ORDER BY changed_at DESC,id DESC LIMIT 1", (price["id"],)).fetchone() if price else None
     fields["price_revision_id"] = revision[0] if revision else None
     fields.update(provider_usage_schema=event.provider_usage_schema, identity_status=identity_status, error_code=event.error_code)
+    fields.update(identity_platform=event.platform, external_user_id=event.external_user_id, identity_source=event.identity_source)
     fields.update(turn_id=event.turn_id, time_source=event.time_source, cache_write_tokens=write, cache_write_cost_micro_usd=costs[3], pricing_supported=int(supported))
     if event.turn_id:
         connection.execute('INSERT OR IGNORE INTO turns VALUES(?,?,?,?)', (key(session_key, event.turn_id), session_key, event.turn_id, timestamp))
@@ -128,11 +135,13 @@ def ingest_tool(connection, event):
     event_key = key(event.instance_id, event.profile_id, "tool", event.source_event_id)
     if connection.execute("SELECT 1 FROM tool_calls WHERE event_key=?", (event_key,)).fetchone():
         return False
+    event = prepare(connection, event)
     user_id, department_id, identity_status = resolve(connection, event)
     event = event.model_copy(update={'user_id': user_id, 'department_id': department_id})
     session_key = session(connection, event)
     fields = {"event_key": event_key, "instance_id": event.instance_id, "profile_id": event.profile_id, "source_event_id": event.source_event_id, "session_key": session_key, "user_id": event.user_id, "department_id": event.department_id, "tool_id": event.tool_id, "tool_name": event.tool_name, "tool_type": event.tool_type, "mcp_server_id": event.mcp_server_id, "status": event.status, "duration_ms": event.duration_ms, "occurred_at": utc(event.occurred_at)}
     fields['identity_status'] = identity_status
+    fields.update(identity_platform=event.platform, external_user_id=event.external_user_id, identity_source=event.identity_source)
     fields.update(turn_id=event.turn_id, time_source=event.time_source)
     if event.turn_id:
         connection.execute('INSERT OR IGNORE INTO turns VALUES(?,?,?,?)', (key(session_key, event.turn_id), session_key, event.turn_id, fields['occurred_at']))

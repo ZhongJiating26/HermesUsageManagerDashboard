@@ -7,6 +7,7 @@ import socket
 import sqlite3
 import sys
 import threading
+from time import monotonic
 from collections import Counter
 from pathlib import Path
 from uuid import uuid4
@@ -60,6 +61,7 @@ class Collector:
         self.stop = threading.Event()
         self.wake = threading.Event()
         self.thread = None
+        self.next_people_sync = 0
         self.store = None
         self.storage_failed = False
         if start:
@@ -174,6 +176,13 @@ class Collector:
                 self.buffer.task_done()
         self.drain()
         self.heartbeat()
+        if self.source == 'live' and monotonic() >= self.next_people_sync:
+            self.next_people_sync = monotonic() + 60
+            try:
+                from .people import sync
+                sync(self.store)
+            except (OSError, ValueError, sqlite3.Error):
+                logger.warning('People metadata sync unavailable; model/tool collection continues')
         self.storage_failed = False
 
     def run(self):

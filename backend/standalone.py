@@ -294,7 +294,14 @@ def setup_installation(args, database, origin):
         if password != getpass.getpass('再次输入密码: '):
             raise ValueError('Passwords do not match')
         initialize_auth(auth, password)
-    create_app(auth, database, origin, args.allow_http)
+    application = create_app(auth, database, origin, args.allow_http)
+    try:
+        from .people import sync
+        people = sync(application.state.hum_runtime.store)
+        if people['available']:
+            print(f"人员同步：新增 {people['created']} 人，补全 {people['requests']} 条请求、{people['tools']} 条工具调用。")
+    except (OSError, ValueError, sqlite3.Error):
+        print('人员元数据暂不可读，可稍后在人员设置中同步；安装配置继续。')
     if not existing:
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
