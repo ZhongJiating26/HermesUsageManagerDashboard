@@ -5,6 +5,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from .db import now
+from .events import estimate_costs
 from .queries import rows
 from .schemas import price_period
 
@@ -25,9 +26,28 @@ def save_price(connection, principal, body, price_id=""):
     values = (price_id, body.provider, body.model, str(body.input), str(body.cached), str(body.output), str(body.valid_from), str(body.valid_to) if body.valid_to else None, start, end, int(body.enabled))
     connection.execute("INSERT INTO model_prices(id,provider,model,input,cached,output,valid_from,valid_to,starts_at,ends_at,enabled) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET provider=excluded.provider,model=excluded.model,input=excluded.input,cached=excluded.cached,output=excluded.output,valid_from=excluded.valid_from,valid_to=excluded.valid_to,starts_at=excluded.starts_at,ends_at=excluded.ends_at,enabled=excluded.enabled", values)
     config = body.model_dump(mode="json")
-    connection.execute("INSERT INTO price_revisions VALUES(?,?,?,?,?)", (uuid4().hex, price_id, principal.id, now(), json.dumps(config)))
+    revision_id = uuid4().hex
+    connection.execute("INSERT INTO price_revisions VALUES(?,?,?,?,?)", (revision_id, price_id, principal.id, now(), json.dumps(config)))
     audit(connection, principal, "price.save", price_id)
+    count = backfill_price(connection, price_id, revision_id)
+    audit(connection, principal, "price.backfill", price_id, json.dumps({'request_count': count, 'revision_id': revision_id}))
     return price_id
+
+
+def backfill_price(connection, price_id, revision_id):
+    """Fill unknown estimates only, using this revision and its effective dates."""
+    price = connection.execute('SELECT * FROM model_prices WHERE id=? AND enabled=1', (price_id,)).fetchone()
+    if price is None:
+        return 0
+    cursor = connection.execute("SELECT event_key,uncached_input_tokens,cached_input_tokens,output_tokens FROM llm_requests WHERE provider=? AND model=? AND occurred_at>=? AND (? IS NULL OR occurred_at<?) AND cost_micro_usd IS NULL AND cost_source='unknown' AND pricing_supported=1 AND uncached_input_tokens IS NOT NULL AND cached_input_tokens IS NOT NULL AND output_tokens IS NOT NULL", (price['provider'], price['model'], price['starts_at'], price['ends_at'], price['ends_at']))
+    count = 0
+    while batch := cursor.fetchmany(500):
+        updates = []
+        for row in batch:
+            costs = estimate_costs(price, row['uncached_input_tokens'], row['cached_input_tokens'], row['output_tokens'])
+            updates.append((price_id, revision_id, sum(costs), *costs, row['event_key']))
+        count += connection.executemany("UPDATE llm_requests SET price_id=?,price_revision_id=?,cost_micro_usd=?,input_cost_micro_usd=?,cached_cost_micro_usd=?,output_cost_micro_usd=?,cost_source='estimated' WHERE event_key=? AND cost_micro_usd IS NULL AND cost_source='unknown'", updates).rowcount
+    return count
 
 
 def price_rows(connection, page=1, page_size=100, order='asc'):
