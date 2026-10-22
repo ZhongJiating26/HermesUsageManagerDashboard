@@ -5,6 +5,7 @@ import hmac
 import ipaddress
 import json
 import os
+import re
 import secrets
 import sqlite3
 import subprocess
@@ -255,6 +256,29 @@ def service_text(auth_file, database, host, port, public_url, allow_http=False, 
     return '\n'.join(['[Unit]', 'Description=Hermes Usage Manager independent web entry', 'After=network.target', '', '[Service]', 'Type=simple', *working_directory, 'Environment=' + quote('USAGE_MANAGER_DB_PATH=' + str(database)), 'Environment=' + quote('HERMES_HOME=' + str(hermes_home())), 'ExecStart=' + ' '.join(quote(value, True) for value in command), 'Restart=on-failure', 'RestartSec=5', 'UMask=0077', 'NoNewPrivileges=true', '', '[Install]', 'WantedBy=default.target', ''])
 
 
+def service_port(text):
+    match = re.search(r'^ExecStart=.* "--port" "([0-9]{1,5})"(?: |$)', text, re.MULTILINE)
+    port = int(match[1]) if match else None
+    return port if port and port <= 65535 else None
+
+
+def installation_port():
+    default = 9120
+    unit = Path.home() / '.config/systemd/user/hermes-usage-manager.service'
+    if not unit.is_symlink() and unit.is_file() and unit.stat().st_size <= 16384:
+        default = service_port(unit.read_text(encoding='utf-8')) or default
+    while True:
+        try:
+            value = input(f'设置用量管理访问端口 [默认 {default}，回车保留]: ').strip()
+        except EOFError:
+            raise ValueError('无法读取端口，请在安装命令后添加 --port 端口号') from None
+        if not value:
+            return default
+        if re.fullmatch(r'[0-9]{1,5}', value) and 1 <= int(value) <= 65535:
+            return int(value)
+        print('请输入 1–65535 之间的端口号。')
+
+
 def setup_installation(args, database, origin):
     """Explicit first-run setup; never run from Hook registration."""
     path = private_path(settings_path())
@@ -287,12 +311,19 @@ def setup_installation(args, database, origin):
         unit.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         if unit.exists():
             previous = unit.read_text(encoding='utf-8')
-            legacy = service_text(auth, database, args.host, args.port, origin, args.allow_http, _legacy=True)
-            old_local = {
-                service_text(auth, database, '127.0.0.1', args.port, f'http://127.0.0.1:{args.port}', _legacy=old)
+            old_port = service_port(previous) or args.port
+            old_origin = origin
+            if origin and not args.public_url:
+                host = '[::1]' if args.host == '::1' else args.host
+                old_origin = f'http://{host}:{old_port}'
+            generated = {
+                service_text(auth, database, args.host, old_port, old_origin, args.allow_http, _legacy=old)
+                for old in (False, True)
+            } | {
+                service_text(auth, database, '127.0.0.1', old_port, f'http://127.0.0.1:{old_port}', _legacy=old)
                 for old in (False, True)
             }
-            if previous != text and (previous == legacy or previous in old_local):
+            if previous != text and previous in generated:
                 backup = unit.with_name(unit.name + '.before-fix-' + secrets.token_hex(4))
                 descriptor = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                 with os.fdopen(descriptor, 'w', encoding='utf-8', newline='\n') as output:
@@ -318,13 +349,18 @@ def main(argv=None):
     parser.add_argument('--auth-file')
     parser.add_argument('--start-service', action='store_true', help='With setup, create and start the Linux user service')
     parser.add_argument('--host', default='127.0.0.1')
-    parser.add_argument('--port', type=int, default=9120)
+    parser.add_argument('--port', type=int, help='Listen port (default: 9120); skips the installation prompt')
+    parser.add_argument('--prompt-port', action='store_true', help='With setup, ask for the listen port if --port is omitted')
     parser.add_argument('--public-url')
     parser.add_argument('--allow-http', action='store_true', help='Allow unencrypted HTTP, including direct access by server IP')
     args = parser.parse_args(argv)
     try:
         if args.start_service and args.action != 'setup':
             raise ValueError('--start-service is only supported with setup')
+        if args.prompt_port and args.action != 'setup':
+            raise ValueError('--prompt-port is only supported with setup')
+        if args.port is None:
+            args.port = installation_port() if args.prompt_port else 9120
         args.auth_file = args.auth_file or settings().get('auth_file') or str(hermes_home() / 'usage-manager-data/standalone-auth.json')
         if args.action == 'init':
             password = getpass.getpass('设置用量管理管理员密码（至少12字符）: ')

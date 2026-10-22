@@ -152,3 +152,69 @@ def test_direct_ip_setup_upgrades_own_loopback_unit_and_keeps_database_and_passw
     assert auth.read_bytes() == password_record
     assert config.database_path() == database
     assert list(unit.parent.glob('hermes-usage-manager.service.before-fix-*'))
+
+
+@pytest.mark.parametrize('host', ['127.0.0.1', '0.0.0.0'])
+def test_prompt_changes_generated_service_port_and_retains_data(installation, monkeypatch, host):
+    monkeypatch.setattr(standalone.sys, 'platform', 'linux')
+    monkeypatch.setattr(standalone.subprocess, 'run', lambda *args, **kwargs: None)
+    options = ['setup', '--start-service', '--host', host, '--allow-http']
+    standalone.main(options)
+    auth = installation / 'usage-manager-data/standalone-auth.json'
+    credentials = auth.read_bytes()
+    with Store(config.database_path()).transaction() as connection:
+        connection.execute("INSERT INTO departments(id, name) VALUES('keep-port', 'Retained')")
+    unit = standalone.Path.home() / '.config/systemd/user/hermes-usage-manager.service'
+    original = unit.read_text(encoding='utf-8')
+    values = iter(['0', '65536', '-1', 'abc', '9.5', '9200'])
+    monkeypatch.setattr('builtins.input', lambda prompt: next(values))
+    standalone.main(options + ['--prompt-port'])
+    assert '"--port" "9200"' in unit.read_text(encoding='utf-8')
+    if host == '127.0.0.1':
+        assert 'http://127.0.0.1:9200' in unit.read_text(encoding='utf-8')
+    backup, = unit.parent.glob('hermes-usage-manager.service.before-fix-*')
+    assert backup.read_text(encoding='utf-8') == original
+    prompts = []
+    monkeypatch.setattr('builtins.input', lambda prompt: prompts.append(prompt) or '')
+    standalone.main(options + ['--prompt-port'])
+    assert '9200' in prompts[0]
+    assert '"--port" "9200"' in unit.read_text(encoding='utf-8')
+    assert len(list(unit.parent.glob('hermes-usage-manager.service.before-fix-*'))) == 1
+    assert auth.read_bytes() == credentials
+    with Store(config.database_path()).read() as connection:
+        assert connection.execute("SELECT name FROM departments WHERE id='keep-port'").fetchone()[0] == 'Retained'
+
+
+def test_port_prompt_default_explicit_override_and_eof(installation, monkeypatch):
+    prompts = []
+    monkeypatch.setattr('builtins.input', lambda prompt: prompts.append(prompt) or '')
+    standalone.main(['setup', '--prompt-port'])
+    assert '9120' in prompts[0]
+    monkeypatch.setattr('builtins.input', lambda prompt: pytest.fail('Explicit --port must skip prompt'))
+    standalone.main(['setup', '--prompt-port', '--port', '65535'])
+    for port in ('0', '65536'):
+        with pytest.raises(SystemExit):
+            standalone.main(['setup', '--prompt-port', '--port', port])
+    def no_input(prompt):
+        raise EOFError
+    monkeypatch.setattr('builtins.input', no_input)
+    with pytest.raises(SystemExit):
+        standalone.main(['setup', '--prompt-port'])
+
+
+def test_port_change_does_not_overwrite_custom_unit(installation, monkeypatch):
+    monkeypatch.setattr(standalone.sys, 'platform', 'linux')
+    calls = []
+    monkeypatch.setattr(standalone.subprocess, 'run', lambda args, **kwargs: calls.append(args))
+    options = ['setup', '--start-service', '--host', '0.0.0.0', '--allow-http']
+    standalone.main(options)
+    unit = standalone.Path.home() / '.config/systemd/user/hermes-usage-manager.service'
+    custom = unit.read_text(encoding='utf-8') + '\n# Customized by administrator\n'
+    unit.write_text(custom, encoding='utf-8')
+    calls.clear()
+    monkeypatch.setattr('builtins.input', lambda prompt: '9200')
+    with pytest.raises(SystemExit):
+        standalone.main(options + ['--prompt-port'])
+    assert unit.read_text(encoding='utf-8') == custom
+    assert not calls
+    assert not list(unit.parent.glob('hermes-usage-manager.service.before-fix-*'))
