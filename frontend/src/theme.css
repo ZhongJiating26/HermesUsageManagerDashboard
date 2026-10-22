@@ -44,6 +44,16 @@
 .hum-root .hum-kpis small { font-size:11px; letter-spacing:normal; font-weight:400; }
 .hum-root .hum-kpis p { color:var(--hum-secondary); font-size:11px; }
 .hum-root .hum-kpi-line { display:flex; flex-wrap:wrap; justify-content:space-between; color:#817989; font-size:10px; margin-top:7px; }
+.hum-root .hum-token-total { margin-top:14px; }
+.hum-root .hum-token-total>span { font-size:12px; color:var(--hum-secondary); }
+.hum-root .hum-token-total strong { font-size:24px; overflow-wrap:anywhere; }
+.hum-root .hum-input-breakdown { border-left:2px solid var(--hum-border); padding-left:10px; }
+.hum-root .hum-input-breakdown p { margin:0 0 8px; }
+.hum-root .hum-input-breakdown .hum-kpi-line { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:3px 6px; align-items:center; }
+.hum-root .hum-input-breakdown .hum-kpi-line>span:nth-child(2) { text-align:right; overflow-wrap:anywhere; }
+.hum-root .hum-input-breakdown meter { grid-column:1 / -1; }
+.hum-root .hum-input-share { text-align:right; }
+.hum-root .hum-token-combined { border-top:1px solid var(--hum-border); padding-top:10px; overflow-wrap:anywhere; }
 .hum-root meter { width:100%; height:5px; margin-top:3px; }
 .hum-root meter::-webkit-meter-bar { background:var(--hum-container); border:0; }
 .hum-root meter::-webkit-meter-optimum-value { background:var(--hum-primary); }

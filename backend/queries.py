@@ -43,6 +43,9 @@ def analytics(connection, window, principal):
     sums = "sum(uncached_input_tokens) AS input,sum(cached_input_tokens) AS cached,sum(cache_write_tokens) AS cache_write,sum(output_tokens) AS output,sum(total_tokens) AS total_tokens,sum(cost_micro_usd) AS cost,sum(input_cost_micro_usd) AS input_cost,sum(cached_cost_micro_usd) AS cached_cost,sum(cache_write_cost_micro_usd) AS cache_write_cost,sum(output_cost_micro_usd) AS output_cost"
     kpis = dict(connection.execute(f"SELECT count(*) AS count,count(DISTINCT user_id) AS active,sum(cost_micro_usd IS NULL) AS unknown_cost,sum(cached_input_tokens IS NULL) AS unknown_cache,{sums} FROM llm_requests WHERE {condition}", values).fetchone())
     count = kpis.pop("count")
+    # Fully unknown inputs contribute to neither side; only mismatched coverage makes shares ambiguous.
+    incomplete_input = "(input_total_tokens IS NOT NULL OR uncached_input_tokens IS NOT NULL OR cached_input_tokens IS NOT NULL OR cache_write_tokens IS NOT NULL) AND (input_total_tokens IS NULL OR uncached_input_tokens IS NULL OR cached_input_tokens IS NULL OR cache_write_tokens IS NULL)"
+    kpis.update(dict(connection.execute(f"SELECT sum(input_total_tokens) AS input_total,sum({incomplete_input}) AS unknown_input_breakdown FROM llm_requests WHERE {condition}", values).fetchone()))
     if count == 0:
         kpis = {key: 0 if value is None else value for key, value in kpis.items()}
     for field in ("cost", "input_cost", "cached_cost", "output_cost", "cache_write_cost"):

@@ -37,8 +37,19 @@ export function AnalyticsPage({ page, selection, drill, historyAllowed = false }
   } };
   return <div className="hum-stack"><p className="hum-caption">统计卡片、分布图和逐次排行仅含当前采集库中的已知用量；历史汇总单独展示。用量单位为 M Token（百万 Token）。</p>
     {page === 'overview' && <div className="hum-kpis">
-      <section><h2>用量 · M Token</h2><strong>{million(total, 2)}<small> M Token</small></strong>{([['输入（未命中缓存）', kpis.input], ['输入（命中缓存）', kpis.cached], ['缓存写入', kpis.cache_write], ['输出', kpis.output]] as const).map(([label, value]) => <div className="hum-kpi-line" key={label}><span>{label}</span><span>{tokens(value)}</span>{value != null && <meter min={0} max={total || 1} value={value} />}</div>)}</section>
-      <section><h2>费用 · 已知部分估算</h2><strong>{money(kpis.cost)} <small>USD</small></strong>{([['输入（未命中缓存）', kpis.input_cost], ['输入（命中缓存）', kpis.cached_cost], ['缓存写入', kpis.cache_write_cost], ['输出', kpis.output_cost]] as const).map(([label, value]) => <div className="hum-kpi-line" key={label}><span>{label}</span><span>{money(value)}</span>{value != null && <meter min={0} max={kpis.cost || 1} value={value} />}</div>)}</section>
+      <section aria-label="输入输出用量"><div className="hum-title"><h2>输入 / 输出</h2><InfoTip label="输入构成说明">输入总量包含普通输入、缓存读取和缓存写入，三项互不重复；普通输入不含缓存读取和写入。占比以已知输入总量为分母；输入部分已知、部分缺失或输入总量为零时，占比显示未知。输入全未知的请求不参与构成统计。各项仍独立计价。</InfoTip></div>
+        <div className="hum-token-total"><span>输入总量</span><strong>{million(kpis.input_total)}<small> M Token</small></strong></div>
+        <div className="hum-input-breakdown" aria-label="输入构成">
+          <p>输入构成 · 占输入总量</p>
+          {([['普通输入', kpis.input], ['缓存读取', kpis.cached], ['缓存写入', kpis.cache_write]] as const).map(([label, value]) => {
+            const share = value != null && kpis.input_total != null && kpis.input_total > 0 && kpis.unknown_input_breakdown === 0 ? value / kpis.input_total : null;
+            return <div className="hum-kpi-line" key={label}><span>{label}</span><span>{tokens(value)}</span><span className="hum-input-share">{share == null ? '占比未知' : new Intl.NumberFormat('zh-CN', { style: 'percent', maximumFractionDigits: 2 }).format(share)}</span>{share != null && <meter aria-label={`${label}占输入总量`} min={0} max={1} value={share} />}</div>;
+          })}
+        </div>
+        <div className="hum-token-total"><span>输出总量</span><strong>{million(kpis.output)}<small> M Token</small></strong></div>
+        <p className="hum-token-combined">输入输出合计：{tokens(total)}</p>
+      </section>
+      <section><h2>费用 · 已知部分估算</h2><strong>{money(kpis.cost)} <small>USD</small></strong>{([['普通输入', kpis.input_cost], ['缓存读取', kpis.cached_cost], ['缓存写入', kpis.cache_write_cost], ['输出', kpis.output_cost]] as const).map(([label, value]) => <div className="hum-kpi-line" key={label}><span>{label}</span><span>{money(value)}</span>{value != null && <meter min={0} max={kpis.cost || 1} value={value} />}</div>)}</section>
       <section className="hum-active"><div><h2>活跃人数</h2><strong>{kpis.active}<small> 人</small></strong></div><div><h2>主力模型</h2><b>{kpis.primary_model ?? '—'}</b></div></section>
     </div>}
     <section className="hum-card"><div className="hum-title"><h2>{page === 'mcp' ? 'MCP 调用次数' : 'Token 消耗 / 活跃人数'}</h2><InfoTip label="用量数据说明">{page === 'mcp' ? '仅统计已确认属于 MCP 的工具调用，单位为次。' : `数据质量：${kpis.unknown_cache} 条请求缓存细分未知；${kpis.unknown_cost} 条请求费用未知。图表展示已知部分。`}</InfoTip></div><EChart option={trendOption(data, page)} label={page === 'mcp' ? 'MCP 调用趋势' : 'Token 与活跃人数趋势'} height={320} /></section>

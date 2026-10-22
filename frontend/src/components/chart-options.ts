@@ -16,7 +16,7 @@ export function trendOption(data: Analytics, mode: 'overview' | 'usage' | 'mcp')
     yAxis: [{ ...axis, type: 'value', name: mode === 'mcp' ? '调用次数' : 'M Token', axisLabel: { formatter: mode === 'mcp' ? compact : formatScaled, color: '#77717e' } }, ...(mode === 'mcp' ? [] : [{ ...axis, type: 'value' as const, name: '活跃人数', minInterval: 1, splitLine: { show: false } }])],
     series: mode === 'mcp' ? [{ type: 'line', name: 'MCP 调用', smooth: true, data: main.map((item) => item.calls), itemStyle: { color: '#8268b9' }, areaStyle: { opacity: 0.16 }, showSymbol: false }]
       : mode === 'overview' ? [{ type: 'line', name: '用量', smooth: true, data: main.map((item) => scaled(item.total_tokens)), tooltip: tokenTooltip, itemStyle: { color: '#8b87e8' } }, { type: 'line', name: '活跃人数', yAxisIndex: 1, smooth: true, data: main.map((item) => item.active), itemStyle: { color: '#b1cf19' } }]
-        : [...(['cached', 'input', 'cache_write', 'output'] as const).map((key, index) => ({ type: 'bar' as const, name: ['输入（命中缓存）', '输入（未命中缓存）', '缓存写入', '输出'][index], stack: 'tokens', data: main.map((item) => scaled(item[key])), tooltip: tokenTooltip, barMaxWidth: 44 })), { type: 'line', name: '活跃人数', yAxisIndex: 1, smooth: true, data: main.map((item) => item.active) }] };
+        : [...(['cached', 'input', 'cache_write', 'output'] as const).map((key, index) => ({ type: 'bar' as const, name: ['缓存读取', '普通输入', '缓存写入', '输出'][index], stack: 'tokens', data: main.map((item) => scaled(item[key])), tooltip: tokenTooltip, barMaxWidth: 44 })), { type: 'line', name: '活跃人数', yAxisIndex: 1, smooth: true, data: main.map((item) => item.active) }] };
 }
 
 export function pieOption(rows: Distribution[], metric: 'tokens' | 'cost'): ChartOption {
@@ -46,5 +46,5 @@ export function departmentOption(rows: Distribution[], metric: 'tokens' | 'cost'
   if (metric === 'cost') return { ...rankOption(rows.map((item) => ({ name: item.name, value: item.cost })), 'cost'), color: ['#6750a4'] };
   return { color: ['#cbbbf4', '#9980d0', '#6750a4'], tooltip: { trigger: 'axis', renderMode: 'richText', confine: true }, legend: { bottom: 0, textStyle: { fontSize: 10 } },
     grid: { left: 55, right: 25, top: 25, bottom: 68 }, xAxis: { ...axis, type: 'category', data: rows.map((item) => item.name) }, yAxis: { ...axis, type: 'value', name: 'M Token', axisLabel: { formatter: formatScaled, color: '#77717e' } },
-    series: (['cached', 'input', 'cache_write', 'output'] as const).map((field, index) => ({ type: 'bar', stack: 'tokens', name: ['输入（命中缓存）', '输入（未命中缓存）', '缓存写入', '输出'][index], data: rows.map((item) => scaled(item[field])), tooltip: tokenTooltip, barMaxWidth: 50 })) };
+    series: (['cached', 'input', 'cache_write', 'output'] as const).map((field, index) => ({ type: 'bar', stack: 'tokens', name: ['缓存读取', '普通输入', '缓存写入', '输出'][index], data: rows.map((item) => scaled(item[field])), tooltip: tokenTooltip, barMaxWidth: 50 })) };
 }

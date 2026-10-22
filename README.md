@@ -355,10 +355,12 @@ Hermes Dashboard 顶层插件 Tab：“用量管理” (/usage-manager)
 
 - `input_total_tokens`：Provider 报告的总输入（若可确认）。
 - `cached_input_tokens`：已命中缓存的输入部分（若报告、且不超过总输入）。
-- `uncached_input_tokens = input_total_tokens - cached_input_tokens`，**仅在两者都可信且语义已验证时成立**。
+- `cache_write_tokens`：输入中用于缓存写入的部分，独立于缓存读取。
+- `uncached_input_tokens = input_total_tokens - cached_input_tokens - cache_write_tokens`：普通输入，不含缓存读取和写入；**仅在相关字段可信且语义已验证时成立**。
 - `output_tokens`：输出 Tokens。
 - `total_tokens = input_total_tokens + output_tokens`；不能再把已包含在 input_total 中的 cached_input 重复加一次。
 - 缺失细分字段时保留 `NULL`，在 UI 显示未知；不能用临时估算误当真实值。
+- 概览主要展示输入总量、输出总量，输入下按普通输入、缓存读取、缓存写入细分。API 的 `kpis.input_total` 直接汇总 `input_total_tokens`，不从不完整细分推算。`unknown_input_breakdown` 为输入部分已知、部分缺失的请求数；大于零或已知输入总量为零时，不显示构成占比。输入总量及三项细分全未知的请求不参与构成统计。所有指标限于当前筛选范围的已知部分，四类费用仍独立计价。
 
 ### 6.2 请求/会话/用户
 

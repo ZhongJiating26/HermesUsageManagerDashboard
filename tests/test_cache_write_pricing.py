@@ -29,6 +29,8 @@ def test_write_price_backfills_history_once_with_four_distinct_buckets(runtime, 
     assert (detail['input'], detail['cached'], detail['cache_write'], detail['output']) == (3, 48134, 942, 49)
     summary = client.get(PREFIX + '/overview/summary', params=RANGE).json()['data']
     assert summary['kpis']['total_tokens'] == 49128
+    assert summary['kpis']['input_total'] == 49079
+    assert summary['kpis']['unknown_input_breakdown'] == 0
     assert summary['kpis']['cache_write'] == 942
     assert summary['kpis']['cache_write_cost'] == pytest.approx(0.000118)
     assert sum(summary['kpis'][field] for field in ('input', 'cached', 'cache_write', 'output')) == 49128
@@ -42,6 +44,25 @@ def test_write_price_backfills_history_once_with_four_distinct_buckets(runtime, 
     exported = client.get(PREFIX + '/exports/requests.csv', params=RANGE)
     assert exported.status_code == 200
     assert 'cache_write' in exported.text.splitlines()[0]
+
+
+def test_input_total_keeps_known_totals_when_breakdown_is_missing(runtime, client):
+    insert(runtime, write_event())
+    insert(runtime, model('unknown-cache', input_total_tokens=100, cached_input_tokens=None))
+    insert(runtime, model('unknown-all', input_total_tokens=None, cached_input_tokens=None, output_tokens=None, provider_usage_schema='unknown', pricing_supported=False))
+    kpis = client.get(PREFIX + '/overview/summary', params=RANGE).json()['data']['kpis']
+    assert kpis['input_total'] == 49179
+    assert kpis['unknown_input_breakdown'] == 1
+    assert (kpis['input'], kpis['cached'], kpis['cache_write']) == (3, 48134, 942)
+    with runtime.store.transaction() as connection:
+        connection.execute("DELETE FROM llm_requests WHERE source_event_id='unknown-cache'")
+    kpis = client.get(PREFIX + '/overview/summary', params=RANGE).json()['data']['kpis']
+    assert kpis['input_total'] == 49079
+    assert kpis['unknown_input_breakdown'] == 0  # Fully unknown requests do not change known-input shares.
+    with runtime.store.transaction() as connection:
+        connection.execute('DELETE FROM llm_requests')
+    kpis = client.get(PREFIX + '/overview/summary', params=RANGE).json()['data']['kpis']
+    assert kpis['input_total'] == kpis['unknown_input_breakdown'] == 0
 
 
 def test_upgrade_legacy_canonical_write_rows_without_repricing_known_costs(runtime):
