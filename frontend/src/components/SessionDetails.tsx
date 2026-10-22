@@ -54,6 +54,7 @@ export function SessionDetails({ session, filters, selection }: { session: Sessi
         <div><dt>输入未命中</dt><dd>{tokens(session.input)}</dd></div>
         <div><dt>输出</dt><dd>{tokens(session.output)}</dd></div>
         <div><dt>缓存读取</dt><dd>{tokens(session.cached)}</dd></div>
+        <div><dt>缓存写入</dt><dd>{tokens(session.cache_write)}</dd></div>
       </dl>
     </header>
     <div ref={scroll} className="hum-conversation" role="region" aria-label="对话记录" tabIndex={0} aria-busy={resource.loading}>

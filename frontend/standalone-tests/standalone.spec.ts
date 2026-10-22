@@ -79,3 +79,29 @@ test('all pages render at the independent port and mobile fits the viewport', as
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: '../build/standalone-mobile.png', fullPage: true });
 });
+
+test('editing a missing cache-write rate backfills a historical request through the authenticated UI', async ({ page }) => {
+  await login(page);
+  await page.getByRole('button', { name: '模型设置', exact: false }).click();
+  await page.getByRole('tab', { name: /待设置价格/ }).click();
+  const pending = page.locator('tbody tr').filter({ has: page.getByRole('cell', { name: 'cache-write-regression', exact: true }) });
+  await expect(pending).toContainText('缓存写入未定价');
+  await pending.getByRole('button', { name: '设置价格', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '编辑价格', exact: true })).toBeVisible();
+  await expect(page.getByLabel('缓存写入单价')).toHaveValue('');
+  await page.getByLabel('缓存写入单价').fill('0.125');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(pending).toHaveCount(0);
+  const result = await page.evaluate(async () => (await (await fetch('/api/plugins/hermes-usage-manager/requests?all_time=true')).json()).data[0]);
+  expect(result.input).toBe(3);
+  expect(result.cache_write).toBe(942);
+  expect(result.cost).toBe(0.000624);
+  await page.getByRole('button', { name: '用量明细', exact: false }).click();
+  await page.locator('tbody .hum-row-link').first().click();
+  const dialog = page.getByRole('dialog', { name: '请求详情', exact: true });
+  await expect(dialog.getByText('缓存写入', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('0.000942 M Token', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('0.000003 M Token', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('$0.0006', { exact: true })).toBeVisible();
+  await page.screenshot({ path: '../build/cache-write-request-detail.png', fullPage: true });
+});

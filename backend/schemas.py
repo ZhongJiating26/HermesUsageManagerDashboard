@@ -71,6 +71,7 @@ class PriceBody(BaseModel):
     input: Decimal = Field(ge=0, max_digits=16, decimal_places=6, allow_inf_nan=False)
     cached: Decimal = Field(ge=0, max_digits=16, decimal_places=6, allow_inf_nan=False)
     output: Decimal = Field(ge=0, max_digits=16, decimal_places=6, allow_inf_nan=False)
+    cache_write: Decimal | None = Field(default=None, ge=0, max_digits=16, decimal_places=6, allow_inf_nan=False)
     valid_from: date
     valid_to: date | None = None
     enabled: bool = True

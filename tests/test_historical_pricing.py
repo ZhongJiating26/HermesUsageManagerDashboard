@@ -32,7 +32,7 @@ def test_save_price_backfills_only_eligible_unknown_history(runtime, client):
         assert after[identifier]['price_id'] == price_id
         assert after[identifier]['price_revision_id']
         assert after[identifier]['cost_source'] == 'estimated'
-        assert {k: v for k, v in before[identifier].items() if k not in ('price_id', 'price_revision_id', 'cost_micro_usd', 'cost_source', 'input_cost_micro_usd', 'cached_cost_micro_usd', 'output_cost_micro_usd')} == {k: v for k, v in after[identifier].items() if k not in ('price_id', 'price_revision_id', 'cost_micro_usd', 'cost_source', 'input_cost_micro_usd', 'cached_cost_micro_usd', 'output_cost_micro_usd')}
+        assert {k: v for k, v in before[identifier].items() if k not in ('price_id', 'price_revision_id', 'cost_micro_usd', 'cost_source', 'input_cost_micro_usd', 'cached_cost_micro_usd', 'output_cost_micro_usd', 'cache_write_cost_micro_usd')} == {k: v for k, v in after[identifier].items() if k not in ('price_id', 'price_revision_id', 'cost_micro_usd', 'cost_source', 'input_cost_micro_usd', 'cached_cost_micro_usd', 'output_cost_micro_usd', 'cache_write_cost_micro_usd')}
     # Editing or re-saving the price never overwrites an already known estimate.
     response = client.patch(PREFIX + '/models/prices/' + price_id, json=price(input='20').model_dump(mode='json'))
     assert response.status_code == 200

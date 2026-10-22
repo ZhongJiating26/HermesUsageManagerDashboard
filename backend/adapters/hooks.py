@@ -44,7 +44,7 @@ def usage_fields(usage):
             return unknown
         if values['prompt_tokens'] != values['input_tokens'] + values['cache_read_tokens'] + values['cache_write_tokens']:
             return unknown
-        return {'input_total_tokens': values['prompt_tokens'], 'cached_input_tokens': values['cache_read_tokens'], 'output_tokens': values['output_tokens'], 'cache_write_tokens': values['cache_write_tokens'], 'provider_usage_schema': 'hermes-canonical/source-525dbcad', 'pricing_supported': values['cache_write_tokens'] == 0}
+        return {'input_total_tokens': values['prompt_tokens'], 'cached_input_tokens': values['cache_read_tokens'], 'output_tokens': values['output_tokens'], 'cache_write_tokens': values['cache_write_tokens'], 'provider_usage_schema': 'hermes-canonical/source-525dbcad', 'pricing_supported': True}
     return unknown
 
 

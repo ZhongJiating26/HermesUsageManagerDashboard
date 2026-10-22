@@ -40,12 +40,12 @@ def coverage(connection):
 def analytics(connection, window, principal):
     condition, values = where(window, principal)
     tool_condition, tool_values = where(window, principal, tools=True)
-    sums = "sum(uncached_input_tokens) AS input,sum(cached_input_tokens) AS cached,sum(output_tokens) AS output,sum(total_tokens) AS total_tokens,sum(cost_micro_usd) AS cost,sum(input_cost_micro_usd) AS input_cost,sum(cached_cost_micro_usd) AS cached_cost,sum(output_cost_micro_usd) AS output_cost"
+    sums = "sum(uncached_input_tokens) AS input,sum(cached_input_tokens) AS cached,sum(cache_write_tokens) AS cache_write,sum(output_tokens) AS output,sum(total_tokens) AS total_tokens,sum(cost_micro_usd) AS cost,sum(input_cost_micro_usd) AS input_cost,sum(cached_cost_micro_usd) AS cached_cost,sum(cache_write_cost_micro_usd) AS cache_write_cost,sum(output_cost_micro_usd) AS output_cost"
     kpis = dict(connection.execute(f"SELECT count(*) AS count,count(DISTINCT user_id) AS active,sum(cost_micro_usd IS NULL) AS unknown_cost,sum(cached_input_tokens IS NULL) AS unknown_cache,{sums} FROM llm_requests WHERE {condition}", values).fetchone())
     count = kpis.pop("count")
     if count == 0:
         kpis = {key: 0 if value is None else value for key, value in kpis.items()}
-    for field in ("cost", "input_cost", "cached_cost", "output_cost"):
+    for field in ("cost", "input_cost", "cached_cost", "output_cost", "cache_write_cost"):
         kpis[field] = usd(kpis[field])
     distributions = {}
     columns = {"department": ("department_id", "departments"), "user": ("user_id", "users"), "model": ("model", None), "provider": ("provider", None)}
@@ -57,7 +57,7 @@ def analytics(connection, window, principal):
             item["name"] = names.get(item["id"], item["id"] or "未归属")
             item["tokens"] = item.pop("total_tokens")
             item["cost"] = usd(item["cost"])
-            for field in ("input_cost", "cached_cost", "output_cost"):
+            for field in ("input_cost", "cached_cost", "output_cost", "cache_write_cost"):
                 item.pop(field)
         distributions[dimension] = grouped
     kpis["primary_model"] = distributions["model"][0]["name"] if distributions["model"] and distributions["model"][0]['tokens'] is not None else None
@@ -87,9 +87,9 @@ def analytics(connection, window, principal):
     trend = []
     while day < end:
         key = day.isoformat()[:width]
-        item = daily.get(key, {"day": key, "input": 0, "cached": 0, "output": 0, "total_tokens": 0, "active": 0})
+        item = daily.get(key, {"day": key, "input": 0, "cached": 0, "cache_write": 0, "output": 0, "total_tokens": 0, "active": 0})
         item['active'] = active_days.get(key, 0)
-        trend.append({field: item[field] for field in ("day", "input", "cached", "output", "total_tokens", "active")} | {"calls": calls.get(key, 0)})
+        trend.append({field: item[field] for field in ("day", "input", "cached", "cache_write", "output", "total_tokens", "active")} | {"calls": calls.get(key, 0)})
         if interval == 'day':
             day += timedelta(days=1)
         elif interval == 'month':
@@ -113,7 +113,7 @@ def request_rows(connection, window, principal, page=1, page_size=20, sort="time
     total = connection.execute(f"SELECT count(*) FROM llm_requests r WHERE {condition}", values).fetchone()[0]
     column = {"time": "occurred_at", "input": "uncached_input_tokens", "output": "output_tokens"}[sort]
     result = rows(connection, f"SELECT r.*,s.source_session_id FROM llm_requests r JOIN sessions s USING(session_key) WHERE {condition} ORDER BY r.{column} {'DESC' if order == 'desc' else 'ASC'},r.event_key LIMIT ? OFFSET ?", [*values, page_size, (page - 1) * page_size])
-    return [{"id": item["event_key"], "time": item["occurred_at"], "department_id": item["department_id"] or "", "user_id": item["user_id"] or "", "profile": item["profile_id"], "instance_id": item["instance_id"], "session_id": item["source_session_id"], "session_key": item["session_key"], "model": item["model"], "provider": item["provider"], "status": item["status"], "input": item["uncached_input_tokens"], "input_total_tokens": item["input_total_tokens"], "total_tokens": item["total_tokens"], "cached": item["cached_input_tokens"], "output": item["output_tokens"], "duration_ms": item["duration_ms"], "cost": usd(item["cost_micro_usd"]), "cost_source": item["cost_source"], "price_id": item["price_id"]} for item in result], total
+    return [{"id": item["event_key"], "time": item["occurred_at"], "department_id": item["department_id"] or "", "user_id": item["user_id"] or "", "profile": item["profile_id"], "instance_id": item["instance_id"], "session_id": item["source_session_id"], "session_key": item["session_key"], "model": item["model"], "provider": item["provider"], "status": item["status"], "input": item["uncached_input_tokens"], "input_total_tokens": item["input_total_tokens"], "total_tokens": item["total_tokens"], "cached": item["cached_input_tokens"], "cache_write": item["cache_write_tokens"], "cache_write_cost": usd(item["cache_write_cost_micro_usd"]), "output": item["output_tokens"], "duration_ms": item["duration_ms"], "cost": usd(item["cost_micro_usd"]), "cost_source": item["cost_source"], "price_id": item["price_id"]} for item in result], total
 
 
 def session_rows(connection, window, principal, page=1, page_size=20, sort="time", order="desc", search="", session_id=None):
@@ -125,7 +125,7 @@ def session_rows(connection, window, principal, page=1, page_size=20, sort="time
     if search:
         condition += " AND s.source_session_id LIKE ?"
         values.append(f"%{search}%")
-    grouped = f"SELECT r.session_key AS id,min(r.occurred_at) AS time,CASE WHEN count(DISTINCT coalesce(r.department_id,''))=1 THEN min(r.department_id) END AS department_id,CASE WHEN count(DISTINCT coalesce(r.user_id,''))=1 THEN min(r.user_id) END AS user_id,min(r.profile_id) AS profile,'unknown' AS platform,sum(r.uncached_input_tokens) AS input,sum(r.cached_input_tokens) AS cached,sum(r.output_tokens) AS output FROM llm_requests r JOIN sessions s USING(session_key) WHERE {condition} GROUP BY r.session_key"
+    grouped = f"SELECT r.session_key AS id,min(r.occurred_at) AS time,CASE WHEN count(DISTINCT coalesce(r.department_id,''))=1 THEN min(r.department_id) END AS department_id,CASE WHEN count(DISTINCT coalesce(r.user_id,''))=1 THEN min(r.user_id) END AS user_id,min(r.profile_id) AS profile,'unknown' AS platform,sum(r.uncached_input_tokens) AS input,sum(r.cached_input_tokens) AS cached,sum(r.cache_write_tokens) AS cache_write,sum(r.output_tokens) AS output FROM llm_requests r JOIN sessions s USING(session_key) WHERE {condition} GROUP BY r.session_key"
     total = connection.execute(f"SELECT count(*) FROM ({grouped})", values).fetchone()[0]
     column = {"time": "time", "input": "input", "output": "output"}[sort]
     result = rows(connection, f"SELECT * FROM ({grouped}) ORDER BY {column} {'DESC' if order == 'desc' else 'ASC'},id LIMIT ? OFFSET ?", [*values, page_size, (page - 1) * page_size])

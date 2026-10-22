@@ -49,14 +49,14 @@ def test_unknown_usage_schema_does_not_fabricate_zeros(scope, usage):
     assert event.output_tokens is None and event.pricing_supported is False
 
 
-def test_canonical_zero_cache_and_unsupported_cache_write(scope):
+def test_canonical_zero_cache_and_supported_cache_write(scope):
     values = payload()['usage'] | {'input_tokens': 100, 'cache_read_tokens': 0, 'prompt_tokens': 100}
     event = hooks.Normalizer().normalize('post_api_request', payload(usage=values), scope)
     assert event.input_total_tokens == 100 and event.cached_input_tokens == 0
     values = payload()['usage'] | {'cache_write_tokens': 10, 'prompt_tokens': 110}
     event = hooks.Normalizer().normalize('post_api_request', payload(usage=values), scope)
     assert event.input_total_tokens == 110 and event.cache_write_tokens == 10
-    assert event.pricing_supported is False
+    assert event.pricing_supported is True
 
 
 @pytest.mark.parametrize('input_tokens,output_tokens', [(100, 20), (100, 0), (0, 20), (0, 0)])
@@ -430,7 +430,7 @@ def test_upgrade_m2_database_preserves_existing_facts(tmp_path, monkeypatch):
     upgraded = db.Store(path)
     with upgraded.read() as connection:
         assert connection.execute('SELECT name FROM departments').fetchone()[0] == 'Keep'
-        assert connection.execute('SELECT count(*) FROM schema_migrations').fetchone()[0] == 5
+        assert connection.execute('SELECT count(*) FROM schema_migrations').fetchone()[0] == 6
         assert connection.execute('SELECT count(*) FROM collection_queue').fetchone()[0] == 0
         assert connection.execute('SELECT cost_micro_usd FROM llm_requests').fetchone()[0] == 235
 

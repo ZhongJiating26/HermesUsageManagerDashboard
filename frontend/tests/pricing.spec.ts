@@ -1,5 +1,26 @@
 import { test, expect } from './fixtures';
 
+test('cache-write prices preserve precision, persist, and distinguish unset from zero', async ({ page }) => {
+  await page.goto('/?hum_page=models');
+  const configured = page.locator('tbody tr').filter({ has: page.getByRole('cell', { name: 'claude-sonnet-4', exact: true }) }).first();
+  await configured.getByRole('button', { name: '编辑', exact: true }).click();
+  await expect(page.getByLabel('缓存写入单价')).toHaveValue('');
+  await page.getByLabel('缓存写入单价').fill('0.125');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(configured).toContainText('$0.125');
+  await page.reload();
+  await configured.getByRole('button', { name: '编辑', exact: true }).click();
+  await expect(page.getByLabel('缓存写入单价')).toHaveValue('0.125');
+  await page.getByLabel('缓存写入单价').fill('0');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(configured).not.toContainText('未设置');
+  await configured.getByRole('button', { name: '编辑', exact: true }).click();
+  await page.getByLabel('缓存写入单价').fill('');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(configured).toContainText('未设置');
+  await page.screenshot({ path: '../build/cache-write-prices.png', fullPage: true });
+});
+
 test('prices support date ranges, edit existing entries, and resolve unpriced conversation models', async ({ page }) => {
   await page.goto('/?hum_page=models');
   const configured = page.locator('tbody tr').filter({ has: page.getByRole('cell', { name: 'claude-sonnet-4', exact: true }) }).first();
