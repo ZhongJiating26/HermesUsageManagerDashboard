@@ -29,6 +29,8 @@ class Totals(BaseModel):
 
 
 class KPI(Totals):
+    input_total: int | None
+    unknown_input_breakdown: int
     total_tokens: int | None
     cost: float | None
     input_cost: float | None
