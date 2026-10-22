@@ -66,7 +66,7 @@ export function Dashboard({ live = false, ready = false }: { live?: boolean; rea
     requests: '输入列为未命中缓存的输入量；缺失字段显示 —。点击请求时间查看详情。',
     sessions: '点击会话 ID 查看详情。详情为补充设计，支持连续工具调用分组展开。',
     people: '迁移会改变用户的主部门，历史请求的部门快照保持不变。修改保存在当前 SQLite 数据库。',
-    models: '价格变更不回改历史请求费用。价格按 USD / 百万 Tokens。起止日期均包含，按 Asia/Shanghai 判断；结束日期留空为长期有效。同模型启用区间不可重叠。待设置价格按调用日期列出未覆盖区间；已设置价格可编辑。修改保存在当前 SQLite 数据库。',
+    models: '已有费用保持不变；保存价格会补算生效日期内缺失的历史费用，用量不完整时仍显示未知。价格按 USD / M Token。起止日期均包含，按 Asia/Shanghai 判断；结束日期留空为长期有效。同模型启用区间不可重叠。待设置价格按调用日期列出未覆盖区间；已设置价格可编辑。修改保存在当前 SQLite 数据库。',
   };
   return <section className="hum-root" aria-label="用量管理"><div className="hum-mobile-bar"><b>用量管理</b><button className="hum-outline" aria-expanded={drawer} aria-controls="hum-navigation" onClick={() => setDrawer(!drawer)}>{drawer ? '收起导航' : '打开导航'}</button></div>
     <aside className={`hum-sidebar ${drawer ? 'hum-sidebar-open' : ''}`} id="hum-navigation"><nav aria-label="用量管理导航"><p className="hum-nav-label">数据</p>{pages.map((item, index) => <React.Fragment key={item.id}>{index === 5 && <><hr /><p className="hum-nav-label">配置</p></>}<button className={page === item.id ? 'hum-nav-active' : ''} aria-current={page === item.id ? 'page' : undefined} disabled={!permitted(item.id)} onClick={() => navigate(item.id as PageId)}><MaterialIcon name={item.icon} />{item.label}</button></React.Fragment>)}</nav></aside>

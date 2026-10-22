@@ -6,7 +6,7 @@ test('review changes use local Material Symbols and hide explanatory notes until
   await page.goto('/?hum_page=models');
   await expect(page.locator('tbody tr').first()).toBeVisible();
   await expect(page.locator('.hum-scope, .hum-quality')).toHaveCount(0);
-  const note = page.getByText('价格变更不回改历史请求费用。', { exact: false });
+  const note = page.getByText('已有费用保持不变；保存价格会补算生效日期内缺失的历史费用', { exact: false });
   await expect(note).not.toBeVisible();
   await page.getByLabel('模型设置说明').click();
   await expect(note).toBeVisible();

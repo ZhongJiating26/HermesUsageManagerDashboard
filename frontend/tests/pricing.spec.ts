@@ -26,6 +26,7 @@ test('prices support date ranges, edit existing entries, and resolve unpriced co
   await page.getByLabel('输出单价').fill('1');
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect(unpriced).toHaveCount(0);
+  await expect(page.getByRole('status')).toContainText('已补算生效日期内可计价的历史缺失费用');
   await page.getByRole('tab', { name: /已设置价格/ }).click();
   await expect(page.locator('tbody tr').filter({ has: page.getByRole('cell', { name: 'unpriced-demo', exact: true }) })).toHaveCount(1);
   await page.screenshot({ path: '../build/m1/prices-ranges.png', fullPage: true });

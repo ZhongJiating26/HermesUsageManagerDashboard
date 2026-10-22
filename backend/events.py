@@ -86,6 +86,12 @@ def session(connection, event):
     return session_key
 
 
+def estimate_costs(price, uncached, cached, output, pricing_supported=True):
+    if not price or not pricing_supported or any(value is None for value in (uncached, cached, output)):
+        return [None, None, None]
+    return [int((Decimal(price[field]) * tokens).quantize(Decimal('1'), rounding=ROUND_HALF_UP)) for field, tokens in zip(("input", "cached", "output"), (uncached, cached, output))]
+
+
 def ingest_model(connection, event):
     event_key = key(event.instance_id, event.profile_id, "model", event.source_event_id)
     if connection.execute("SELECT 1 FROM llm_requests WHERE event_key=?", (event_key,)).fetchone():
@@ -98,9 +104,7 @@ def ingest_model(connection, event):
     uncached = input_total - cached if input_total is not None and cached is not None else None
     total = input_total + output if input_total is not None and output is not None else None
     price = connection.execute("SELECT * FROM model_prices WHERE provider=? AND model=? AND enabled=1 AND starts_at<=? AND (ends_at IS NULL OR ends_at>?)", (event.provider, event.model, timestamp, timestamp)).fetchone()
-    costs = [None, None, None]
-    if price and event.pricing_supported and uncached is not None and cached is not None and output is not None:
-        costs = [int((Decimal(price[field]) * tokens).quantize(Decimal('1'), rounding=ROUND_HALF_UP)) for field, tokens in zip(("input", "cached", "output"), (uncached, cached, output))]
+    costs = estimate_costs(price, uncached, cached, output, event.pricing_supported)
     cost = sum(costs) if all(value is not None for value in costs) else None
     fields = {"event_key": event_key, "instance_id": event.instance_id, "profile_id": event.profile_id, "source_event_id": event.source_event_id, "session_key": session_key, "api_request_id": event.api_request_id, "attempt_no": event.attempt_no, "request_kind": event.request_kind, "provider": event.provider, "model": event.model, "user_id": event.user_id, "department_id": event.department_id, "occurred_at": timestamp, "status": event.status, "input_total_tokens": input_total, "cached_input_tokens": cached, "uncached_input_tokens": uncached, "output_tokens": output, "total_tokens": total, "duration_ms": event.duration_ms, "price_id": price["id"] if price else None, "cost_micro_usd": cost, "cost_source": "estimated" if cost is not None else "unknown", "input_cost_micro_usd": costs[0], "cached_cost_micro_usd": costs[1], "output_cost_micro_usd": costs[2]}
     revision = connection.execute("SELECT id FROM price_revisions WHERE price_id=? ORDER BY changed_at DESC,id DESC LIMIT 1", (price["id"],)).fetchone() if price else None
