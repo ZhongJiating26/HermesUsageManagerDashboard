@@ -430,7 +430,7 @@ def test_upgrade_m2_database_preserves_existing_facts(tmp_path, monkeypatch):
     upgraded = db.Store(path)
     with upgraded.read() as connection:
         assert connection.execute('SELECT name FROM departments').fetchone()[0] == 'Keep'
-        assert connection.execute('SELECT count(*) FROM schema_migrations').fetchone()[0] == 6
+        assert connection.execute('SELECT count(*) FROM schema_migrations').fetchone()[0] == 7
         assert connection.execute('SELECT count(*) FROM collection_queue').fetchone()[0] == 0
         assert connection.execute('SELECT cost_micro_usd FROM llm_requests').fetchone()[0] == 235
 

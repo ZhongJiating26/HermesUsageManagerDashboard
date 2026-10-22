@@ -293,6 +293,16 @@ def move(body: MoveBody, runtime=Depends(get_runtime), principal=Depends(get_pri
     return envelope(runtime, {"ok": True})
 
 
+@router.post('/people/sync', response_model=Envelope)
+def sync_people(runtime=Depends(get_runtime), principal=Depends(get_principal)):
+    require(principal, 'write')
+    from .people import sync
+    result = sync(runtime.store, actor=principal)
+    if not result['available']:
+        raise HTTPException(409, result['message'])
+    return envelope(runtime, result)
+
+
 @router.post("/people/users", response_model=Envelope)
 @router.patch("/people/users/{user_id}", response_model=Envelope)
 def save_user(body: UserBody, user_id: str = "", runtime=Depends(get_runtime), principal=Depends(get_principal)):
@@ -303,7 +313,7 @@ def save_user(body: UserBody, user_id: str = "", runtime=Depends(get_runtime), p
         if user_id:
             if not connection.execute("SELECT 1 FROM users WHERE id=? AND status='active'", (user_id,)).fetchone():
                 raise HTTPException(404, "用户不存在")
-            connection.execute("UPDATE users SET name=?,external_id=?,profile=?,platform=? WHERE id=?", (body.name, body.external_id, body.profile, body.platform, user_id))
+            connection.execute("UPDATE users SET name=?,external_id=?,profile=?,platform=?,name_source='manual' WHERE id=?", (body.name, body.external_id, body.profile, body.platform, user_id))
         else:
             user_id = f"u-{uuid4().hex}"
             connection.execute("INSERT INTO users(id,name,external_id,profile,platform) VALUES(?,?,?,?,?)", (user_id, body.name, body.external_id, body.profile, body.platform))

@@ -42,9 +42,9 @@ def history_home(tmp_path, runtime):
             c.execute('INSERT INTO departments(id,name) VALUES(?,?)', (department, department))
             c.execute('INSERT INTO users(id,name,platform,external_id,department_id) VALUES(?,?,?,?,?)', (uid, name, 'feishu', external, department))
     with sqlite3.connect(home / 'state.db') as c:
-        c.execute('CREATE TABLE sessions(id,source,user_id,parent_session_id,profile_name)')
+        c.execute("CREATE TABLE sessions(id,source,user_id,parent_session_id,profile_name,chat_type DEFAULT 'dm')")
         c.execute('CREATE TABLE session_model_usage(session_id,input_tokens,cache_read_tokens,cache_write_tokens,output_tokens,api_call_count)')
-        c.executemany('INSERT INTO sessions VALUES(?,?,?,?,?)', [
+        c.executemany('INSERT INTO sessions(id,source,user_id,parent_session_id,profile_name) VALUES(?,?,?,?,?)', [
             ('s-mao', 'feishu', 'open-mao', None, 'default'),
             ('s-zhong', 'feishu', 'open-zhong', None, 'default'),
             ('child', 'subagent', None, 's-mao', 'default'),
@@ -73,6 +73,18 @@ def test_history_ranking_uses_aggregate_once_and_keeps_it_outside_requests(runti
         filtered = user_history(c, department_id='d2', home=history_home, profile_name='default')
         assert [r['name'] for r in filtered['users']] == ['钟佳挺']
     assert hashlib.sha256(path.read_bytes()).hexdigest() == before
+
+
+def test_group_lifetime_aggregate_is_not_assigned_to_the_first_sender(runtime, history_home):
+    with sqlite3.connect(history_home / 'state.db') as c:
+        c.execute("INSERT INTO sessions VALUES('group','feishu','open-mao',NULL,'default','group')")
+        c.execute("INSERT INTO session_model_usage VALUES('group',9000000,0,0,0,100)")
+    with runtime.store.read() as c:
+        result = user_history(c, home=history_home, profile_name='default')
+    mao = next(row for row in result['users'] if row['id'] == 'mao')
+    unknown = next(row for row in result['users'] if row['id'] == '')
+    assert mao['tokens'] == 3000210
+    assert unknown['tokens'] == 9000000
 
 
 def test_admin_history_endpoint_and_scoped_roles(runtime, client, history_home, monkeypatch):

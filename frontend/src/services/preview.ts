@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { getSDK } from '../platform/hermes-sdk';
 import { React } from '../platform/react-host';
 
+export const peopleSyncSchema = z.object({ available: z.literal(true), created: z.number(), requests: z.number(), tools: z.number(), sessions: z.number() });
 export const departmentSchema = z.object({ id: z.string(), name: z.string() });
 export const userSchema = z.object({ id: z.string(), name: z.string(), external_id: z.string(), department_id: z.string(), profile: z.string(), platform: z.string().default('feishu') });
 export const filtersSchema = z.object({ departments: departmentSchema.array(), users: userSchema.array(), servers: departmentSchema.array(), anchor: z.string(), role: z.string() });

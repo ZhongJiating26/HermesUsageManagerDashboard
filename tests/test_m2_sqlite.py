@@ -65,7 +65,7 @@ def test_migrations_persist_and_reject_mode_or_checksum_changes(tmp_path):
         connection.execute("INSERT INTO departments(id,name) VALUES('d1','Persistent')")
     reopened = db.Store(path, 'mock')
     with reopened.read() as connection:
-        assert connection.execute('SELECT count(*) FROM schema_migrations').fetchone()[0] == 6
+        assert connection.execute('SELECT count(*) FROM schema_migrations').fetchone()[0] == 7
         assert connection.execute('SELECT name FROM departments').fetchone()[0] == 'Persistent'
         assert connection.execute('PRAGMA journal_mode').fetchone()[0] == 'wal'
         assert connection.execute('PRAGMA foreign_keys').fetchone()[0] == 1
@@ -191,8 +191,9 @@ def test_identity_uses_external_id_and_historical_department_not_name(runtime):
         rows = {row['source_event_id']: dict(row) for row in connection.execute('SELECT * FROM llm_requests')}
     assert rows['one']['user_id'] == 'u1'
     assert rows['one']['department_id'] == 'd1'
-    assert rows['unknown']['identity_status'] == 'unresolved'
-    assert rows['unknown']['user_id'] is None
+    assert rows['unknown']['identity_status'] == 'resolved'
+    assert rows['unknown']['user_id'] not in (None, 'u1')
+    assert rows['unknown']['department_id'] is None
 
 
 def test_explicit_profile_mapping_is_not_assumed_from_display_field(runtime):

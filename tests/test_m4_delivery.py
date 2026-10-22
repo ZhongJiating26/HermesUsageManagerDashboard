@@ -250,7 +250,7 @@ def test_inspect_db_is_read_only_and_returns_only_aggregate_metadata(tmp_path):
     before = manage.digest(path)
     result = manage.inspect_database(path)
     assert result['data_source'] == 'live'
-    assert len(result['migrations']) == 6
+    assert len(result['migrations']) == 7
     assert result['counts']['llm_requests'] == 0
     assert 'never printed' not in json.dumps(result)
     assert manage.digest(path) == before

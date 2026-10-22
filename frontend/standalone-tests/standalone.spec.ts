@@ -105,3 +105,25 @@ test('editing a missing cache-write rate backfills a historical request through 
   await expect(dialog.getByText('$0.0006', { exact: true })).toBeVisible();
   await page.screenshot({ path: '../build/cache-write-request-detail.png', fullPage: true });
 });
+
+test('people are discovered automatically, synchronized, and manual names survive resync', async ({ page }) => {
+  await login(page);
+  await page.getByRole('button', { name: '人员设置', exact: false }).click();
+  await expect(page.getByRole('cell', { name: '自动发现用户', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: '待同步用户', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '同步 Hermes 人员', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('新增 1 人');
+  await expect(page.getByRole('cell', { name: '待同步用户', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '编辑用户 自动发现用户', exact: true }).click();
+  await page.getByLabel('名称', { exact: true }).fill('人工确认姓名');
+  await expect(page.getByLabel('Profile')).toHaveValue('');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByRole('cell', { name: '人工确认姓名', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '同步 Hermes 人员', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('新增 0 人');
+  await expect(page.getByRole('cell', { name: '人工确认姓名', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('cell', { name: '人工确认姓名', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: '未分配部门', exact: true }).first()).toBeVisible();
+  await page.screenshot({ path: '../build/people-discovery.png', fullPage: true });
+});
