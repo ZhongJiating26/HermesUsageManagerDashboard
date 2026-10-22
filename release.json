@@ -1,7 +1,7 @@
 {
   "files": {
-    "CHANGELOG.md": "07ea6f757b68802ed8a54df0967858b31d913679f43ca0c892eb14b3d2ce5a83",
-    "README.md": "7df6ae379dbddfc17f45fce9a080a2ad95771e3e545d141998a55d8b7955245e",
+    "CHANGELOG.md": "299992ac7182edbbb8ff27b5ab478dda794aa67911cb46f7246a7ef01877d773",
+    "README.md": "fb8dfb9a43c5036c40d0c4d2373e6ca11304ffd60889275e3eeb4afcbd11ea01",
     "__init__.py": "b5673fe796091f6d578484ad6d6725332a44d57f9307d45ddcae212715627029",
     "backend/__init__.py": "ed1fafd50ce033cf0aa3abe4488c7e8063fdd18e5b47a845e22ff08dc8f5e8c7",
     "backend/adapters/__init__.py": "d8370d1d4d8b5f72c26ef0fd57681beb38a88092029b22e6d344f0244ff8cc55",
@@ -27,7 +27,7 @@
     "backend/responses.py": "f1a63a5aaa44e43106ed865b885ff23ca05aa643dcb3757f8de297f28fb5dd56",
     "backend/schemas.py": "a62011bdea90e54ee6af0ba7e3d737efd6a7559ab486c4418a0ee064f31025db",
     "backend/security.py": "7c416f186113f8bddb7ccd9652054897255388283894749860d7ee456ac50823",
-    "backend/standalone.py": "66f33b641041268a930303b33f6344135f74877200a3947d76921a9029cdadcd",
+    "backend/standalone.py": "8ceab49f343363d15c682fd17858dfbefae1c047916ec5d5feed5873005ef2b1",
     "dashboard/dist/THIRD_PARTY_NOTICES.txt": "89fb80abbf5c498a982e8c08aab59fbad55ef05556e10f34adbd6142af625be9",
     "dashboard/dist/assets/material-symbols-XUHUDEAK.ttf": "f4d212199bbe8c75f2a305cadbc9b0d858aeef3139ba64246cdec8d3e2a90106",
     "dashboard/dist/index.js": "9c5b71649a8854e2edf39d17d9dc69220570b7798d4c803738fa324710b9002e",
@@ -56,8 +56,8 @@
     "docs/m4-report.md": "e6a6ae626f8427b22a39abd6a65fa1d17c643779eb2e12145bf9dee888dc9d1f",
     "docs/security-review.md": "13973c14d1179ea3e51f0c998db67e0378e9af7ab82c3bdca92381871ab07249",
     "docs/standalone-report.md": "99baa39326c5c8fb983f0b3e6bac5cde7e98bf57f214cb61a6761f4dd107a72c",
-    "docs/standalone.md": "b102a62aad7f33aec7598c1e9a22d521ac7b502be7d4798424b3d5779fefdd6b",
-    "install.sh": "d825def811f1144a9014941449b93a180a8b5c3cca11c190c8cb14e653af783a",
+    "docs/standalone.md": "a3fad6670f4554f100a4f02bc1aace725018b698d0f02992998f01f1a5b81477",
+    "install.sh": "bc1963f7a436c03b7c48bb8050796e5113712a67cc61559ad58555340dc53873",
     "ops/__init__.py": "92c730bb1cfe93d4bebd27e549d4474add59269743aa91800f0a74ad4b929ee3",
     "ops/manage.py": "f350e8bd901b28fa072faa3bdff42bc55f8122469de4c1bd65e8f3f0162e8b37",
     "plugin.yaml": "63dce99fee8873552b3b7ccbf02e0b7497f11ee52b78d18105f498f939ed6db4",
@@ -74,7 +74,7 @@
   "name": "hermes-usage-manager",
   "release_status": "released",
   "source_dirty": false,
-  "source_revision": "298e25f205ea838a87655e3682734445d8e8a757",
+  "source_revision": "92d167093ac3f34838d0813b4cfa1ecefed9c54f",
   "source_tag": null,
   "version": "0.6.0"
 }
