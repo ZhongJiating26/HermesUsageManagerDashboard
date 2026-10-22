@@ -46,6 +46,8 @@ class ModelEvent(BaseModel):
             raise ValueError("Invalid normalized event")
         if self.input_total_tokens is not None and self.cached_input_tokens is not None and self.cached_input_tokens > self.input_total_tokens:
             raise ValueError("Cached input cannot exceed total input")
+        if self.input_total_tokens is not None and self.cached_input_tokens is not None and self.cache_write_tokens is not None and self.cached_input_tokens + self.cache_write_tokens > self.input_total_tokens:
+            raise ValueError('Cache reads and writes cannot exceed total input')
         return self
 
 
@@ -86,10 +88,10 @@ def session(connection, event):
     return session_key
 
 
-def estimate_costs(price, uncached, cached, output, pricing_supported=True):
-    if not price or not pricing_supported or any(value is None for value in (uncached, cached, output)):
-        return [None, None, None]
-    return [int((Decimal(price[field]) * tokens).quantize(Decimal('1'), rounding=ROUND_HALF_UP)) for field, tokens in zip(("input", "cached", "output"), (uncached, cached, output))]
+def estimate_costs(price, uncached, cached, output, pricing_supported=True, cache_write=0):
+    if not price or not pricing_supported or any(value is None for value in (uncached, cached, output, cache_write)) or (cache_write and price['cache_write'] is None):
+        return [None, None, None, None]
+    return [int((Decimal(price[field]) * tokens).quantize(Decimal('1'), rounding=ROUND_HALF_UP)) if tokens else 0 for field, tokens in zip(("input", "cached", "output", "cache_write"), (uncached, cached, output, cache_write))]
 
 
 def ingest_model(connection, event):
@@ -101,16 +103,20 @@ def ingest_model(connection, event):
     session_key = session(connection, event)
     timestamp = utc(event.occurred_at)
     input_total, cached, output = event.input_total_tokens, event.cached_input_tokens, event.output_tokens
-    uncached = input_total - cached if input_total is not None and cached is not None else None
+    write = event.cache_write_tokens
+    if write is None and event.provider_usage_schema == 'normalized/v1' and event.pricing_supported:
+        write = 0
+    supported = event.pricing_supported or (event.provider_usage_schema == 'hermes-canonical/source-525dbcad' and write is not None and write > 0 and input_total is not None and cached is not None and output is not None)
+    uncached = input_total - cached - write if input_total is not None and cached is not None and write is not None else None
     total = input_total + output if input_total is not None and output is not None else None
     price = connection.execute("SELECT * FROM model_prices WHERE provider=? AND model=? AND enabled=1 AND starts_at<=? AND (ends_at IS NULL OR ends_at>?)", (event.provider, event.model, timestamp, timestamp)).fetchone()
-    costs = estimate_costs(price, uncached, cached, output, event.pricing_supported)
+    costs = estimate_costs(price, uncached, cached, output, supported, write)
     cost = sum(costs) if all(value is not None for value in costs) else None
     fields = {"event_key": event_key, "instance_id": event.instance_id, "profile_id": event.profile_id, "source_event_id": event.source_event_id, "session_key": session_key, "api_request_id": event.api_request_id, "attempt_no": event.attempt_no, "request_kind": event.request_kind, "provider": event.provider, "model": event.model, "user_id": event.user_id, "department_id": event.department_id, "occurred_at": timestamp, "status": event.status, "input_total_tokens": input_total, "cached_input_tokens": cached, "uncached_input_tokens": uncached, "output_tokens": output, "total_tokens": total, "duration_ms": event.duration_ms, "price_id": price["id"] if price else None, "cost_micro_usd": cost, "cost_source": "estimated" if cost is not None else "unknown", "input_cost_micro_usd": costs[0], "cached_cost_micro_usd": costs[1], "output_cost_micro_usd": costs[2]}
     revision = connection.execute("SELECT id FROM price_revisions WHERE price_id=? ORDER BY changed_at DESC,id DESC LIMIT 1", (price["id"],)).fetchone() if price else None
     fields["price_revision_id"] = revision[0] if revision else None
     fields.update(provider_usage_schema=event.provider_usage_schema, identity_status=identity_status, error_code=event.error_code)
-    fields.update(turn_id=event.turn_id, time_source=event.time_source, cache_write_tokens=event.cache_write_tokens, pricing_supported=int(event.pricing_supported))
+    fields.update(turn_id=event.turn_id, time_source=event.time_source, cache_write_tokens=write, cache_write_cost_micro_usd=costs[3], pricing_supported=int(supported))
     if event.turn_id:
         connection.execute('INSERT OR IGNORE INTO turns VALUES(?,?,?,?)', (key(session_key, event.turn_id), session_key, event.turn_id, timestamp))
     connection.execute(f"INSERT INTO llm_requests({','.join(fields)}) VALUES({','.join('?' for _ in fields)})", tuple(fields.values()))

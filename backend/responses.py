@@ -24,6 +24,7 @@ class Health(BaseModel):
 class Totals(BaseModel):
     input: int | None
     cached: int | None
+    cache_write: int | None
     output: int | None
 
 
@@ -32,6 +33,7 @@ class KPI(Totals):
     cost: float | None
     input_cost: float | None
     cached_cost: float | None
+    cache_write_cost: float | None
     output_cost: float | None
     active: int
     unknown_cost: int

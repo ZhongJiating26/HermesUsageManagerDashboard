@@ -338,7 +338,7 @@ def export(window=Depends(get_window), runtime=Depends(get_runtime), principal=D
             raise HTTPException(422, "导出上限为 10000 条，请缩小日期范围")
         admin.audit(connection, principal, "export.requests", str(total))
     stream = io.StringIO()
-    fields = ["id", "time", "provider", "model", "input", "cached", "output", "cost", "cost_source"]
+    fields = ["id", "time", "provider", "model", "input", "cached", "cache_write", "output", "cost", "cost_source"]
     writer = csv.writer(stream)
     writer.writerow(fields)
     for item in data:
