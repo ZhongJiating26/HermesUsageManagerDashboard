@@ -136,13 +136,20 @@ def create_app(auth_file, database, public_url, allow_http=False, assets=None):
     salt, expected = read_auth(auth_file)
     if Path(database).resolve().name.casefold() == 'state.db':
         raise ValueError('Do not use the Hermes core state.db as a usage database')
-    runtime = api.Runtime(Store(database), content_provider=api.HermesSessionContentProvider(local_admin=True))
+    runtime = api.Runtime(Store(database), content_provider=api.HermesSessionContentProvider(local_admin=True, archive_root=Path(database).parent / 'attachments'))
     directory = Path(assets) if assets else ROOT / 'standalone/dist'
     for name in ('index.html', 'app.js', 'app.css'):
         if not (directory / name).is_file():
             raise ValueError('Standalone assets are missing; install the prebuilt release')
     sessions = Sessions()
     application = FastAPI(title='Hermes Usage Manager', docs_url=None, redoc_url=None, openapi_url=None)
+    from .attachments import start_worker
+    @application.on_event('startup')
+    def start_attachment_snapshots():
+        application.state.attachment_stop = start_worker(Path(database).parent / 'attachments')
+    @application.on_event('shutdown')
+    def stop_attachment_snapshots():
+        application.state.attachment_stop.set()
     application.state.hum_runtime = runtime
     application.state.hum_sessions = sessions
     if parsed:
