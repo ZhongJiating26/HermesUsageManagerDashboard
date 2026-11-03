@@ -71,9 +71,10 @@ def tool_arguments(value):
 
 
 class HermesSessionContentProvider:
-    def __init__(self, factory=None, homes=None, *, local_admin=False):
+    def __init__(self, factory=None, homes=None, *, local_admin=False, archive_root=None):
         self.factory, self.homes = factory, homes
         self.local_admin = local_admin
+        self.archive_root = archive_root
 
     def local_scope(self, instance_id, profile_id):
         from ..collector import context
@@ -93,7 +94,7 @@ class HermesSessionContentProvider:
             profile = 'default' if home == (Path.home() / '.hermes').resolve() else scope.profile_id
         return home, profile
 
-    def read(self, instance_id, profile_id, session_id, offset=0, limit=100):
+    def read(self, instance_id, profile_id, session_id, offset=0, limit=100, latest=False):
         enabled = os.environ.get('USAGE_MANAGER_SESSION_CONTENT')
         if not (enabled == '1' if enabled is not None else self.local_admin):
             raise unavailable()
@@ -126,12 +127,20 @@ class HermesSessionContentProvider:
                     raise unavailable()
                 # Bounded lookbehind also matches calls when a page starts with
                 # a tool result whose assistant invocation was on the prior page.
-                lookbehind = min(offset, 200)
-                options = {'limit': lookbehind + limit + 1, 'offset': offset - lookbehind, 'latest': False}
+                lookbehind = 0 if latest else min(offset, 200)
+                options = {'limit': lookbehind + limit + 1, 'offset': offset - lookbehind, 'latest': latest}
                 if 'include_ancestors' in parameters:
                     options['include_ancestors'] = False
                 signature.bind(session_id, **options)
                 messages = database.get_messages(session_id, **options)
+                if latest:
+                    has_older = len(messages) > limit
+                    messages = messages[-limit:]
+                from ..attachments import Archive, display_text
+                archive = Archive(self.archive_root)
+                for item in messages:
+                    archive.capture(home, session_id, item.get('id'), item.get('role'), item.get('content'))
+                attachments = archive.listing(home, session_id)
             finally:
                 database.close()
             if not isinstance(messages, list) or any(not isinstance(message, dict) for message in messages):
@@ -171,6 +180,6 @@ class HermesSessionContentProvider:
                 else:
                     projected.append({'id': identifier, 'kind': 'tools', 'text': '', 'tools': [tool]})
             else:
-                projected.append({'id': identifier, 'kind': role, 'text': redact(message.get('content')), 'time': timestamp, 'tools': []})
+                projected.append({'id': identifier, 'kind': role, 'text': redact(display_text(role, message.get('content'), [f for f in attachments if f['message'] == identifier])), 'time': timestamp, 'tools': []})
         page_count = max(0, len(messages) - lookbehind)
-        return {'title': redact(owner['title'])[:200] if isinstance(owner.get('title'), str) else None, 'messages': projected, 'pagination': {'offset': offset, 'limit': limit, 'has_more': page_count > limit, 'returned': min(page_count, limit)}}
+        return {'title': redact(owner['title'])[:200] if isinstance(owner.get('title'), str) else None, 'messages': projected, 'attachments': attachments, 'pagination': {'offset': offset, 'limit': limit, 'has_more': has_older if latest else page_count > limit, 'returned': min(page_count, limit)}}

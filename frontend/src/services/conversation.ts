@@ -32,13 +32,13 @@ export function useConversation(path: string) {
       setState((current) => ({ ...current, loading: true, error: null }));
       try {
         const limit = Math.min(100, maximumMessages - offset);
-        const result = await preview(`${path}&offset=${offset}&limit=${limit}`, timelineSchema, { signal: controller.signal });
+        const result = await preview(`${path}&latest=true&offset=${offset}&limit=${limit}`, timelineSchema, { signal: controller.signal });
         const page = result.data.pagination;
         if (page.offset !== offset || !Number.isInteger(page.returned) || page.returned < 0 || page.returned > limit || result.data.messages.length > page.returned || (page.has_more && page.returned === 0)) throw new Error('会话加载进度异常，请关闭详情后重试');
         if (!active) return;
         offset += page.returned;
         more = page.has_more && offset < maximumMessages;
-        setState((current) => ({ path, data: result.data, messages: appendMessages(current.messages, result.data.messages), loaded: offset, loading: false, error: null, hasMore: more, capped: page.has_more && !more }));
+        setState((current) => ({ path, data: result.data, messages: appendMessages(result.data.messages, current.messages), loaded: offset, loading: false, error: null, hasMore: more, capped: page.has_more && !more }));
       } catch (reason) {
         if (active) setState((current) => ({ ...current, loading: false, error: reason instanceof Error ? reason.message : '会话加载失败' }));
       } finally {

@@ -142,3 +142,51 @@ def test_tool_call_linking_across_page_and_reused_ids_is_bounded(local_sessions)
     assert second['pagination']['has_more'] is False
     provider.read(scope.instance_id, scope.profile_id, 's1', offset=1000, limit=100)
     assert requests[-1] == (800, 301)
+
+
+def test_attachment_download_requires_login_and_matching_session(local_sessions, tmp_path):
+    from backend.attachments import Archive
+    home, scope, _ = local_sessions
+    auth = tmp_path / 'credentials/auth.json'
+    password = secrets.token_urlsafe(24)
+    initialize_auth(auth, password)
+    app = create_app(auth, tmp_path / 'usage.sqlite3', 'http://testserver', True)
+    runtime = app.state.hum_runtime
+    with runtime.store.transaction() as connection:
+        for sid in ('s1', 's2'):
+            ingest_model(connection, ModelEvent(instance_id=scope.instance_id, profile_id=scope.profile_id, source_event_id=sid, session_id=sid, api_request_id=sid, provider='Test', model='test', occurred_at='2026-10-20T00:00:00+00:00'))
+    cache = home / 'cache/scratch'
+    cache.mkdir(parents=True)
+    source = cache / 'archive.zip'
+    source.write_bytes(b'PK-snapshot')
+    archive = Archive(tmp_path / 'attachments')
+    archive.capture(home, 's1', 1, 'assistant', f'MEDIA:{source}')
+    file = archive.listing(home, 's1')[0]
+    source.unlink()
+    path = '/api/plugins/hermes-usage-manager/sessions/'
+    suffix = '/attachments/' + file['id'] + '?all_time=true'
+    client = TestClient(app)
+    assert client.get(path + key(scope.instance_id, scope.profile_id, 's1') + suffix).status_code == 401
+    assert client.post('/api/auth/login', headers={'Origin': 'http://testserver'}, json={'password': password}).status_code == 200
+    result = client.get(path + key(scope.instance_id, scope.profile_id, 's1') + suffix)
+    assert result.status_code == 200, result.text
+    assert result.content == b'PK-snapshot'
+    assert 'attachment;' in result.headers['content-disposition']
+    assert client.get(path + key(scope.instance_id, scope.profile_id, 's2') + suffix).status_code == 404
+
+
+def test_latest_pages_are_chronological_and_do_not_skip_messages(local_sessions, tmp_path):
+    home, scope, _ = local_sessions
+    source = [{'id': i, 'session_id': 's1', 'role': 'user', 'content': str(i)} for i in range(205)]
+    class Database:
+        def __init__(self, **kwargs): pass
+        def get_session(self, sid): return {'profile_name': 'default'}
+        def close(self): pass
+        def get_messages(self, sid, limit=None, offset=0, latest=False):
+            selected = list(reversed(source)) if latest else source
+            selected = selected[offset:offset + limit]
+            return list(reversed(selected)) if latest else selected
+    provider = HermesSessionContentProvider(factory=Database, local_admin=True, archive_root=tmp_path / 'attachments')
+    pages = [provider.read(scope.instance_id, scope.profile_id, 's1', offset, 100, latest=True) for offset in (0,100,200)]
+    assert [p['pagination']['has_more'] for p in pages] == [True, True, False]
+    assert [int(m['text']) for p in reversed(pages) for m in p['messages']] == list(range(205))

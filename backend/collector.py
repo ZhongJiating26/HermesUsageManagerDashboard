@@ -221,6 +221,15 @@ class Dispatcher:
             if not (self.enabled if self.enabled is not None else collection_enabled()):
                 return None
             scope = self.context_factory()
+            # Capture persisted inbound messages before model work and outbound
+            # messages at session end, alongside the independent background scan.
+            if name in ('pre_llm_call', 'on_session_end'):
+                try:
+                    from .attachments import Archive
+                    from .config import hermes_home
+                    Archive().scan(hermes_home())
+                except Exception:
+                    logger.exception('Attachment snapshot capture failed')
             with self.lock:
                 collector = self.collectors.get(scope.db_path)
                 if collector is None:

@@ -10,7 +10,7 @@ from threading import RLock
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, FileResponse
 from fastapi.routing import APIRoute
 
 from . import admin, queries, quality
@@ -56,7 +56,7 @@ class Runtime:
 
 @lru_cache(maxsize=16)
 def configured_runtime(path):
-    return Runtime(Store(path), content_provider=HermesSessionContentProvider())
+    return Runtime(Store(path), content_provider=HermesSessionContentProvider(archive_root=__import__('pathlib').Path(path).parent / 'attachments'))
 
 
 def get_runtime():
@@ -184,7 +184,7 @@ def request_detail(event_id: str, window=Depends(get_window), runtime=Depends(ge
 
 @router.get("/sessions/{session_id}", response_model=Envelope)
 @router.get("/sessions/{session_id}/timeline", response_model=Envelope)
-def session_detail(request: Request, session_id: str, offset: int = Query(0, ge=0, le=100000), limit: int = Query(100, ge=1, le=200), window=Depends(get_window), runtime=Depends(get_runtime), principal=Depends(get_principal)):
+def session_detail(request: Request, session_id: str, offset: int = Query(0, ge=0, le=100000), limit: int = Query(100, ge=1, le=200), latest: bool = False, window=Depends(get_window), runtime=Depends(get_runtime), principal=Depends(get_principal)):
     require(principal, "audit")
     with runtime.store.read() as connection:
         condition, values = queries.where(window, principal, "r")
@@ -203,7 +203,7 @@ def session_detail(request: Request, session_id: str, offset: int = Query(0, ge=
                 messages = runtime.content_provider(session_id)
                 content = {'messages': messages[offset:offset + limit], 'pagination': {'offset': offset, 'limit': limit, 'has_more': len(messages) > offset + limit, 'returned': len(messages[offset:offset + limit])}}
             else:
-                content = runtime.content_provider.read(owner['instance_id'], owner['profile_id'], owner['source_session_id'], offset, limit)
+                content = runtime.content_provider.read(owner['instance_id'], owner['profile_id'], owner['source_session_id'], offset, limit, latest=latest)
         except HTTPException as error:
             with runtime.store.transaction() as connection:
                 admin.audit(connection, principal, 'sessions.timeline', session_id, 'denied' if error.status_code == 403 else 'unavailable')
@@ -219,6 +219,33 @@ def session_detail(request: Request, session_id: str, offset: int = Query(0, ge=
     with runtime.store.transaction() as connection:
         admin.audit(connection, principal, 'sessions.detail', session_id)
     return envelope(runtime, session)
+
+
+@router.get('/sessions/{session_id}/attachments/{attachment_id}')
+def download_attachment(session_id: str, attachment_id: str, window=Depends(get_window), runtime=Depends(get_runtime), principal=Depends(get_principal)):
+    require(principal, 'audit_detail')
+    from .attachments import Archive
+    from pathlib import Path
+    with runtime.store.read() as connection:
+        condition, values = queries.where(window, principal, 'r')
+        if not connection.execute(f'SELECT 1 FROM llm_requests r WHERE r.session_key=? AND {condition}', [session_id, *values]).fetchone():
+            raise HTTPException(404, '附件不存在或不在可见范围')
+        owner = connection.execute('SELECT instance_id,profile_id,source_session_id FROM sessions WHERE session_key=?', (session_id,)).fetchone()
+    archive = Archive(runtime.store.path.parent / 'attachments')
+    with archive.connect() as connection:
+        provider = runtime.content_provider
+        if not isinstance(provider, HermesSessionContentProvider):
+            raise HTTPException(404, '附件不可用')
+        homes = provider.homes if provider.homes is not None else json.loads(__import__('os').environ.get('USAGE_MANAGER_SESSION_HOMES', '{}'))
+        home = homes.get(f"{owner['instance_id']}/{owner['profile_id']}")
+        if home is None:
+            home, _ = provider.local_scope(owner['instance_id'], owner['profile_id'])
+        row = connection.execute('SELECT * FROM files WHERE id=? AND session=? AND scope=?', (attachment_id, owner['source_session_id'], str(Path(home).resolve()))).fetchone()
+    if not row or row['status'] != 'ready' or not (archive.root / row['id']).is_file():
+        raise HTTPException(404, '附件快照不可用')
+    with runtime.store.transaction() as connection:
+        admin.audit(connection, principal, 'sessions.attachment.download', session_id + '/' + attachment_id)
+    return FileResponse(archive.root / row['id'], filename=row['name'], media_type='application/octet-stream', headers={'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, no-store'})
 
 
 @router.get("/people/users", response_model=Envelope)
