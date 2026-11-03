@@ -1,5 +1,5 @@
 [project]
 name = "hermes-usage-manager"
-version = "0.6.0"
+version = "0.7.0"
 requires-python = ">=3.11"
 dependencies = ["fastapi>=0.115,<1", "pydantic>=2.9,<3", "tzdata>=2026.1", "uvicorn>=0.30,<1"]

@@ -15,7 +15,7 @@ class Capabilities(BaseModel):
 class Health(BaseModel):
     status: Literal['ok']
     plugin: Literal['hermes-usage-manager']
-    version: Literal['0.6.0']
+    version: str
     milestone: Literal['M4']
     data_source: Literal['mock', 'live']
     capabilities: Capabilities

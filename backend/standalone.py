@@ -198,6 +198,13 @@ def create_app(auth_file, database, public_url, allow_http=False, assets=None):
     async def invalid_request(request, error):
         return JSONResponse({'error': {'code': 'VALIDATION_ERROR', 'message': '请求参数格式不正确'}}, status_code=422)
 
+    from .version import release_info
+    release_info()  # Reject invalid deployment channels at startup.
+
+    @application.get('/api/version')
+    def application_version():
+        return release_info()
+
     @application.post('/api/auth/login')
     def login(body: LoginBody, request: Request, response: Response):
         check_origin(request)

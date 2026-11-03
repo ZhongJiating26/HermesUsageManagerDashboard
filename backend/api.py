@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse, Response, FileResponse
 from fastapi.routing import APIRoute
 
 from . import admin, queries, quality
+from .version import VERSION
 from .adapters.session_content import HermesSessionContentProvider
 from .adapters.hermes import storage_path
 from .db import Store, now
@@ -88,7 +89,7 @@ def health(request: Request, source: str = Depends(data_source)):
         storage = "ready"
     except (RuntimeError, ValueError, sqlite3.Error, OSError):
         pass
-    return {"status": "ok", "plugin": "hermes-usage-manager", "version": "0.6.0", "milestone": "M4", "data_source": source, "capabilities": {"storage": storage, "collection": collection, "hermes_runtime": "unverified", "business_api": True}}
+    return {"status": "ok", "plugin": "hermes-usage-manager", "version": VERSION, "milestone": "M4", "data_source": source, "capabilities": {"storage": storage, "collection": collection, "hermes_runtime": "unverified", "business_api": True}}
 
 
 @router.get('/quality', response_model=Envelope)

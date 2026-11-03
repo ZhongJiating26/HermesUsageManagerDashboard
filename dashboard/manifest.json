@@ -3,7 +3,7 @@
   "label": "用量管理",
   "description": "Hermes Usage Manager · M4 采集与会话适配",
   "icon": "BarChart3",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "tab": { "path": "/usage-manager", "position": "end" },
   "entry": "dist/index.js",
   "css": "dist/style.css",
