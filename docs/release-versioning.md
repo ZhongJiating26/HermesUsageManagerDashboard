@@ -1,6 +1,6 @@
 # 版本与部署阶段
 
-当前基础版本0.7.0。backend/version.py定义VERSION，plugin.yaml、pyproject.toml、dashboard/manifest.json、frontend/package.json、release.json同步维护。版本变化必须同时更新这些元数据并执行tests/test_version.py。
+当前基础版本0.7.1。backend/version.py定义VERSION，plugin.yaml、pyproject.toml、dashboard/manifest.json、frontend/package.json、release.json同步维护。版本变化必须同时更新这些元数据并执行tests/test_version.py。
 
 运行阶段由USAGE_MANAGER_RELEASE_CHANNEL决定，仅支持alpha/beta；默认为beta，非法值阻止服务启动。124由测试服务drop-in配置alpha；43由用户安装，默认beta。基础版本与发布阶段是独立字段，展示为0.7.0 Alpha或0.7.0 Beta，同一版本不需要两份代码。登录前的/api/version只返回版本与阶段，不返回服务器路径或凭据；响应禁止缓存。
 

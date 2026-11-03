@@ -1,7 +1,7 @@
 """Application version and deployment-specific release channel."""
 import os
 
-VERSION = '0.7.0'
+VERSION = '0.7.1'
 
 
 def release_info():

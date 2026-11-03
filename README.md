@@ -1,6 +1,6 @@
 # Hermes Usage Manager
 
-当前版本 0.7.0，提供用量与费用统计、人员和部门分配、供应商与 MCP 分析及对话审计。当前版本已在 Hermes v0.21.0 上部署验证。
+当前版本 0.7.1，提供用量与费用统计、人员和部门分配、供应商与 MCP 分析及对话审计。当前版本已在 Hermes v0.21.0 上部署验证。
 
 ## 安装
 
@@ -100,3 +100,10 @@ journalctl --user -u hermes-usage-manager.service -n 50 --no-pager
 `USAGE_MANAGER_RELEASE_CHANNEL=alpha` 用于124测试环境，`beta`用于43环境；未设置时默认为Beta。两台使用同一份源码，阶段由服务环境决定。变更环境后需重启管理平台服务。43的更新和任何远程代码推送只由维护者本人执行。
 
 更新仍按“更新插件 → 运行install.sh → 重启Gateway”执行。安装前备份插件并停止管理平台服务；已有安装运行install.sh时保留原密码、数据库和端口，43原端口为8500。示例只在维护者已推送目标版本后使用。
+
+
+### 旧安装锁定修复
+
+Hermes会保留之前通过--ref指定的提交，即使使用--force也不会自动移动。新版install.sh成功初始化后自动调用ops/unpin_install.py，仅将本插件安装记录的pinned改为false，并保留原revision和其他插件记录；修改前自动备份元数据。
+
+已被旧提交锁定的服务器必须先由维护者一次性运行新版ops/unpin_install.py（将本地该文件复制到服务器后使用Hermes Python执行）。新脚本无法在旧版本下载前运行，不能只靠推送新版本修复这一步。解除锁定后，今后只需原三条命令：plugins install --force --enable仓库地址、bash install.sh、hermes gateway restart。安装时端口提示回车保留原端口，已有密码和数据库不改。
